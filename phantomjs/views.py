@@ -4,6 +4,7 @@ import base64
 import logging
 import random
 import simplejson
+import timeout_decorator
 from PIL import Image
 from subprocess import Popen, PIPE
 from django.http import HttpResponse
@@ -12,6 +13,7 @@ from phantomjs.settings import phantomjs, rasterize, netsniff, temp
 
 logger = logging.getLogger( "phantomjs.views" )
 
+@timeout_decorator.timeout( 20 )
 def generate_image( url ):
 	tmp = temp + str( random.randint( 0, 100 ) ) + ".jpg"
 	image = Popen( [ phantomjs, rasterize, url, tmp ], stdout=PIPE, stderr=PIPE )
@@ -37,6 +39,7 @@ def strip_debug( json ):
 			return final
 	return lines
 
+@timeout_decorator.timeout( 20 )
 def get_har( url ):
 	har = Popen( [ phantomjs, netsniff, url ], stdout=PIPE, stderr=PIPE )
 	stdout, stderr = har.communicate()
