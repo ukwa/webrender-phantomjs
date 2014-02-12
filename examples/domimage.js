@@ -45,7 +45,8 @@ if ( phantom.args.length == 0 ) {
 			var selectors = phantom.args.slice( 1 );
 			for ( var i = 0; i < selectors.length; i++ ){
 				var sel = selectors[ i ];
-				captureSelector( sel + ".png", sel ) ;
+				var targetFile = encodeURIComponent( sel + ".png" );
+				captureSelector( targetFile, sel ) ;
 			}
 			phantom.exit();
 		}
