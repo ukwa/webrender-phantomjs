@@ -6,8 +6,6 @@
  * This breaks the HAR spec. as it currently stands.
  */
 
-
-
 if (!Date.prototype.toISOString) {
 	Date.prototype.toISOString = function () {
 		function pad(n) { return n < 10 ? '0' + n : n; }
@@ -54,53 +52,21 @@ function createHAR(address, title, startTime, resources, b64_content, b64_image 
 				queryString: [],
 				headersSize: -1,
 				bodySize: -1
-			}
-		});
-		if( request.url === address ) {
-			entries.push({
-				response: {
-					status: endReply.status,
-					statusText: endReply.statusText,
-					httpVersion: "HTTP/1.1",
-					cookies: [],
-					headers: endReply.headers,
-					redirectURL: "",
-					headersSize: -1,
-					bodySize: startReply.bodySize,
-					content: {
-						size: startReply.bodySize,
-						mimeType: endReply.contentType,
-						text: b64_content,
-						renderedElements: [
-							{
-								selector: ":root",
-								format: "PNG",
-								content: b64_image,
-								encoding: "base64"
-							}
-						]
-					}
+			},
+			response: {
+				status: endReply.status,
+				statusText: endReply.statusText,
+				httpVersion: "HTTP/1.1",
+				cookies: [],
+				headers: endReply.headers,
+				redirectURL: "",
+				headersSize: -1,
+				bodySize: startReply.bodySize,
+				content: {
+					size: startReply.bodySize,
+					mimeType: endReply.contentType
 				}
-			});
-		} else {
-			entries.push({
-				response: {
-					status: endReply.status,
-					statusText: endReply.statusText,
-					httpVersion: "HTTP/1.1",
-					cookies: [],
-					headers: endReply.headers,
-					redirectURL: "",
-					headersSize: -1,
-					bodySize: startReply.bodySize,
-					content: {
-						size: startReply.bodySize,
-						mimeType: endReply.contentType
-					}
-				}
-			});
-		}
-		entries.push({
+			},
 			cache: {},
 			timings: {
 				blocked: 0,
@@ -117,7 +83,7 @@ function createHAR(address, title, startTime, resources, b64_content, b64_image 
 
 	return {
 		log: {
-			version: '1.2',
+			version: '0.0.1',
 			creator: {
 				name: "PhantomJS",
 				version: phantom.version.major + '.' + phantom.version.minor +
@@ -129,7 +95,19 @@ function createHAR(address, title, startTime, resources, b64_content, b64_image 
 				title: title,
 				pageTimings: {
 					onLoad: page.endTime - page.startTime
-				}
+				},
+				renderedContent: {
+					text: b64_content,
+					encoding: "base64"
+				},
+				renderedElements: [
+					{
+						selector: ":root",
+						format: "PNG",
+						content: b64_image,
+						encoding: "base64"
+					}
+				]
 			}],
 			entries: entries
 		}
