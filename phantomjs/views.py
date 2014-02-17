@@ -9,7 +9,7 @@ from PIL import Image
 from subprocess import Popen, PIPE
 from django.http import HttpResponse
 from django.views.decorators.gzip import gzip_page
-from phantomjs.settings import phantomjs, rasterize, netsniff, temp
+from phantomjs.settings import *
 
 logger = logging.getLogger( "phantomjs.views" )
 
@@ -69,3 +69,10 @@ def get_image_and_urls( request, url ):
 	data = [ { 'image':image, 'urls':urls } ]
 	json_string = simplejson.dumps( data )
 	return HttpResponse( content = json_string, mimetype="application/json" )
+
+@gzip_page
+def get_dom_image( request, url ):
+	har = Popen( [ phantomjs, domimage, url ], stdout=PIPE, stderr=PIPE )
+	stdout, stderr = har.communicate()
+	return strip_debug( stdout )
+
