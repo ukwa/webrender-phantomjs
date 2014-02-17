@@ -74,5 +74,5 @@ def get_image_and_urls( request, url ):
 def get_dom_image( request, url ):
 	har = Popen( [ phantomjs, domimage, url ], stdout=PIPE, stderr=PIPE )
 	stdout, stderr = har.communicate()
-	return strip_debug( stdout )
+	return HttpResponse( content=strip_debug( stdout ), mimetype="application/json" )
 
