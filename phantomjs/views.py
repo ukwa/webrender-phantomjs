@@ -6,15 +6,17 @@ import random
 import simplejson
 import timeout_decorator
 from PIL import Image
-from subprocess import Popen, PIPE
-from django.http import HttpResponse, HttpResponseServerError
-from django.views.decorators.gzip import gzip_page
 from phantomjs.settings import *
+from subprocess import Popen, PIPE
+from django.views.decorators.gzip import gzip_page
+from django.views.decorators.csrf import csrf_exempt
+from django.http import HttpResponse, HttpResponseServerError
 
 logger = logging.getLogger( "phantomjs.views" )
 
-@timeout_decorator.timeout( 20 )
+@timeout_decorator.timeout( timeout )
 def generate_image( url ):
+	"""Returns a 1280x960 rendering of the webpage."""
 	tmp = temp + str( random.randint( 0, 100 ) ) + ".jpg"
 	image = Popen( [ phantomjs, rasterize, url, tmp ], stdout=PIPE, stderr=PIPE )
 	stdout, stderr = image.communicate()
@@ -26,55 +28,86 @@ def generate_image( url ):
 	return data
 
 def get_image( request, url ):
-	data = generate_image( url )
+	"""Tries to render an image of a URL, returning a 500 if it times out."""
+	try:
+		data = generate_image( url )
+	except timeout_decorator.timeout_decorator.TimeoutError as t:
+		return HttpResponseServerError( content=str( t ) )
 	return HttpResponse( content=data, mimetype="image/jpeg" )
 
 def strip_debug( json ):
+	"""PhantomJs seems to merge its output with its error messages; this
+	tries to strip them."""
 	lines = json.splitlines()
 	for index, line in enumerate( lines ):
-		if line == "{":
-			final= ""
-			for l in lines[ index: ]:
-				final = final + l + "\n"
-			return final
+		if line.startswith( "{" ):
+			return "\n".join( lines[ index: ] )
 	return lines
 
-@timeout_decorator.timeout( 20 )
+@timeout_decorator.timeout( timeout )
 def get_har( url ):
+	"""Gets the raw HAR output from PhantomJs."""
 	har = Popen( [ phantomjs, netsniff, url ], stdout=PIPE, stderr=PIPE )
 	stdout, stderr = har.communicate()
 	return strip_debug( stdout )
 
+@timeout_decorator.timeout( timeout )
+def get_har_with_image( url, selectors=None ):
+	"""Gets the raw HAR output from PhantomJs with rendered image(s)."""
+	command = [ phantomjs, domimage, url ]
+	if selectors is not None:
+		command += selectors
+	har = Popen( command, stdout=PIPE, stderr=PIPE )
+	stdout, stderr = har.communicate()
+	return strip_debug( stdout )
+
 def get_raw( request, url ):
-	json = get_har( url )
-	return HttpResponse( content = json, mimetype="application/json" )
+	"""Tries to retrieve the HAR, returning a 500 if timing out."""
+	try:
+		json = get_har( url )
+	except timeout_decorator.timeout_decorator.TimeoutError as t:
+		return HttpResponseServerError( content=str( t ) )
+	return HttpResponse( content=json, mimetype="application/json" )
 
 def generate_urls( url ):
+	"""Tries to retrieve a list of URLs from the HAR."""
 	json = get_har( url )
-	data = simplejson.loads( json )
 
-	response = ""
-	for entry in data[ "log" ][ "entries" ]:
-		response = response + entry[ "request" ][ "url" ] + "\n"
-	return response
+	data = simplejson.loads( json )
+	return "\n".join( [ entry[ "request" ][ "url" ] for entry in data[ "log" ][ "entries" ] ] )
 
 def get_urls( request, url ):
-	response = generate_urls( url )
-	return HttpResponse( content = response, mimetype="text/plain" )
+	"""Tries to retrieve a list of URLs, returning a 500 if timing out."""
+	try:
+		response = generate_urls( url )
+	except timeout_decorator.timeout_decorator.TimeoutError as t:
+		return HttpResponseServerError( content=str( t ) )
+	return HttpResponse( content=response, mimetype="text/plain" )
 
 @gzip_page
 def get_image_and_urls( request, url ):
-	image = base64.b64encode( generate_image( url ) )
-	urls = generate_urls( url )
+	"""Deprecated in lieu of the HAR-based 'get_dom_image'."""
+	try:
+		image = base64.b64encode( generate_image( url ) )
+		urls = generate_urls( url )
+	except timeout_decorator.timeout_decorator.TimeoutError as t:
+		return HttpResponseServerError( content=str( t ) )
 	data = [ { 'image':image, 'urls':urls } ]
 	json_string = simplejson.dumps( data )
-	return HttpResponse( content = json_string, mimetype="application/json" )
+	return HttpResponse( content=json_string, mimetype="application/json" )
 
 @gzip_page
+@csrf_exempt
 def get_dom_image( request, url ):
-	har = Popen( [ phantomjs, domimage, url ], stdout=PIPE, stderr=PIPE )
-	stdout, stderr = har.communicate()
-	if stdout.startswith( "FAIL" ):
-		return HttpResponseServerError( content="%s\n%s" % ( stdout, stderr ), mimetype="text/plain" )
-	return HttpResponse( content=strip_debug( stdout ), mimetype="application/json" )
-
+	"""Tries to retrieve the HAR with rendered images, returning a 500 if timing out."""
+	try:
+		if request.method == "POST":
+			selectors = request.POST.values()
+			har = get_har_with_image( url, selectors )
+		else:
+			har = get_har_with_image( url )
+	except timeout_decorator.timeout_decorator.TimeoutError as t:
+		return HttpResponseServerError( content=str( t ) )
+	if har.startswith( "FAIL" ):
+		return HttpResponseServerError( content="%s" % har, mimetype="text/plain" )
+	return HttpResponse( content=har, mimetype="application/json" )
