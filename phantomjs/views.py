@@ -7,7 +7,7 @@ import simplejson
 import timeout_decorator
 from PIL import Image
 from subprocess import Popen, PIPE
-from django.http import HttpResponse
+from django.http import HttpResponse, HttpResponseServerError
 from django.views.decorators.gzip import gzip_page
 from phantomjs.settings import *
 
@@ -74,5 +74,7 @@ def get_image_and_urls( request, url ):
 def get_dom_image( request, url ):
 	har = Popen( [ phantomjs, domimage, url ], stdout=PIPE, stderr=PIPE )
 	stdout, stderr = har.communicate()
+	if stdout.startswith( "FAIL" ):
+		return HttpResponseServerError( content="%s\n%s" % ( stdout, stderr ), mimetype="text/plain" )
 	return HttpResponse( content=strip_debug( stdout ), mimetype="application/json" )
 
