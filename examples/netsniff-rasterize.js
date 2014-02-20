@@ -20,7 +20,34 @@ if (!Date.prototype.toISOString) {
 	}
 }
 
-function createHAR(address, title, startTime, resources, b64_content, b64_image )
+capture = function( clipRect ) {
+	if ( clipRect ) {
+		 if ( !typeof( clipRect ) === "object" ) {
+			throw new Error( "clipRect must be an Object instance." );
+		}
+	}
+	try {
+		page.clipRect = clipRect;
+		return page.renderBase64( "PNG" );
+	} catch ( e ) {
+		console.log( "Failed to capture screenshot: " + e, "error" );
+	}
+}
+
+captureSelector = function( selector ) {
+	var clipRect = page.evaluate( function( selector ) {
+		var e = document.querySelector( selector );
+		if( e != null ) {
+			return document.querySelector( selector ).getBoundingClientRect();
+		}
+	}, selector );
+	console.log( JSON.stringify( clipRect ) );
+	if( clipRect != null ) {
+		return capture( clipRect );
+	}
+}
+
+function createHAR(address, title, startTime, resources, b64_content, selectors )
 {
 	var entries = [];
 
@@ -81,6 +108,20 @@ function createHAR(address, title, startTime, resources, b64_content, b64_image 
 		});
 	});
 
+	var renderedElements = [];
+	selectors.forEach( function( selector ) {
+		var image = captureSelector( selector );
+		if( image != null ) {
+			renderedElements.push( {
+				selector: selector,
+				format: "PNG",
+				content: image,
+				encoding: "base64"
+			} );
+		}
+	} );
+
+
 	return {
 		log: {
 			version: '0.0.1',
@@ -100,14 +141,7 @@ function createHAR(address, title, startTime, resources, b64_content, b64_image 
 					text: b64_content,
 					encoding: "base64"
 				},
-				renderedElements: [
-					{
-						selector: ":root",
-						format: "PNG",
-						content: b64_image,
-						encoding: "base64"
-					}
-				]
+				renderedElements: renderedElements
 			}],
 			entries: entries
 		}
@@ -118,8 +152,7 @@ var page = require('webpage').create(),
 	system = require('system');
 
 if (system.args.length === 1) {
-	console.log('Usage: netsniff-rasterize.js URL filename [paperwidth*paperheight|paperformat] [zoom]');
-	console.log('  paper (pdf output) examples: "5in*7.5in", "10cm*20cm", "A4", "Letter"');
+	console.log('Usage: netsniff-rasterize.js URL selectors...');
 	phantom.exit(1);
 } else {
 
@@ -147,16 +180,7 @@ if (system.args.length === 1) {
 		}
 	};
 
-	output = system.args[2];
 	page.viewportSize = { width: 1280, height: 960 };
-	if (system.args.length > 3 && system.args[2].substr(-4) === ".pdf") {
-		size = system.args[3].split('*');
-		page.paperSize = size.length === 2 ? { width: size[0], height: size[1], margin: '0px' }
-										   : { format: system.args[3], orientation: 'portrait', margin: '1cm' };
-	}
-	if (system.args.length > 4) {
-		page.zoomFactor = system.args[4];
-	}
 
 	page.open(page.address, function (status) {
 		if (status !== 'success') {
@@ -167,12 +191,13 @@ if (system.args.length === 1) {
 			page.title = page.evaluate(function () {
 				return document.title;
 			});
-			var b64_image = page.renderBase64( "PNG" );
+			var selectors = phantom.args.slice( 1 );
 			var b64_content = window.btoa( unescape( encodeURIComponent( page.content ) ) );
-			var har = createHAR( page.address, page.title, page.startTime, page.resources, b64_content, b64_image );
+			var har = createHAR( page.address, page.title, page.startTime, page.resources, b64_content, selectors );
 			console.log(JSON.stringify(har, undefined, 4));
 			phantom.exit();
 		}
 	});
 }
+
 
