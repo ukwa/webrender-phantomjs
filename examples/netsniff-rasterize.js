@@ -41,7 +41,6 @@ captureSelector = function( selector ) {
 			return document.querySelector( selector ).getBoundingClientRect();
 		}
 	}, selector );
-	console.log( JSON.stringify( clipRect ) );
 	if( clipRect != null ) {
 		return capture( clipRect );
 	}
@@ -187,15 +186,17 @@ if (system.args.length === 1) {
 			console.log('FAIL to load the address');
 			phantom.exit(1);
 		} else {
-			page.endTime = new Date();
-			page.title = page.evaluate(function () {
-				return document.title;
-			});
-			var selectors = phantom.args.slice( 1 );
-			var b64_content = window.btoa( unescape( encodeURIComponent( page.content ) ) );
-			var har = createHAR( page.address, page.title, page.startTime, page.resources, b64_content, selectors );
-			console.log(JSON.stringify(har, undefined, 4));
-			phantom.exit();
+			window.setTimeout( function () {
+				page.endTime = new Date();
+				page.title = page.evaluate(function () {
+					return document.title;
+				});
+				var selectors = phantom.args.slice( 1 );
+				var b64_content = window.btoa( unescape( encodeURIComponent( page.content ) ) );
+				var har = createHAR( page.address, page.title, page.startTime, page.resources, b64_content, selectors );
+				console.log(JSON.stringify(har, undefined, 4));
+				phantom.exit();
+			}, 200 );
 		}
 	});
 }
