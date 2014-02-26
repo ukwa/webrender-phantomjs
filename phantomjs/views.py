@@ -42,7 +42,7 @@ def strip_debug( json ):
 	for index, line in enumerate( lines ):
 		if line.startswith( "{" ):
 			return "\n".join( lines[ index: ] )
-	return lines
+	return json
 
 @timeout_decorator.timeout( timeout )
 def get_har( url ):
@@ -110,4 +110,4 @@ def get_dom_image( request, url ):
 		return HttpResponseServerError( content=str( t ) )
 	if har.startswith( "FAIL" ):
 		return HttpResponseServerError( content="%s" % har, mimetype="text/plain" )
-	return HttpResponse( content=har, mimetype="application/json" )
+	r = Popen( command, stdout=PIPE, stderr=PIPE )return HttpResponse( content=har, mimetype="application/json" )
