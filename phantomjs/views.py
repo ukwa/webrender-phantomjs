@@ -1,10 +1,10 @@
 import os
 import re
 import base64
-import logging
 import random
+import signal
+import logging
 import simplejson
-import timeout_decorator
 from PIL import Image
 from phantomjs.settings import *
 from subprocess import Popen, PIPE
@@ -14,7 +14,30 @@ from django.http import HttpResponse, HttpResponseServerError
 
 logger = logging.getLogger( "phantomjs.views" )
 
-@timeout_decorator.timeout( timeout )
+class TimeoutException( Exception ):
+	"""Thrown when timeout limit exceeded."""
+	def __init__( self, message ):
+		Exception.__init__( self, message )
+
+def timeout( limit ):
+	"""Decorator specifying a timeout limit."""
+	def decorate( f ):
+		def handler( signum, frame ):
+			raise TimeoutException( "Timed out." )
+
+		def new_f( *args, **kwargs ):
+			old_handler = signal.signal( signal.SIGALRM, handler )
+			signal.alarm( limit )
+			result = f( *args, **kwargs )
+			signal.signal( signal.SIGALRM, old_handler )
+			signal.alarm( 0 )
+			return result
+
+		new_f.func_name = f.func_name
+		return new_f
+	return decorate
+
+@timeout( timeout_limit )
 def generate_image( url ):
 	"""Returns a 1280x960 rendering of the webpage."""
 	tmp = temp + str( random.randint( 0, 100 ) ) + ".jpg"
@@ -31,7 +54,7 @@ def get_image( request, url ):
 	"""Tries to render an image of a URL, returning a 500 if it times out."""
 	try:
 		data = generate_image( url )
-	except timeout_decorator.timeout_decorator.TimeoutError as t:
+	except TimeoutException as t:
 		return HttpResponseServerError( content=str( t ) )
 	return HttpResponse( content=data, mimetype="image/jpeg" )
 
@@ -44,14 +67,14 @@ def strip_debug( json ):
 			return "\n".join( lines[ index: ] )
 	return json
 
-@timeout_decorator.timeout( timeout )
+@timeout( timeout_limit )
 def get_har( url ):
 	"""Gets the raw HAR output from PhantomJs."""
 	har = Popen( [ phantomjs, netsniff, url ], stdout=PIPE, stderr=PIPE )
 	stdout, stderr = har.communicate()
 	return strip_debug( stdout )
 
-@timeout_decorator.timeout( timeout )
+@timeout( timeout_limit )
 def get_har_with_image( url, selectors=None ):
 	"""Gets the raw HAR output from PhantomJs with rendered image(s)."""
 	command = [ phantomjs, domimage, url ]
@@ -65,7 +88,7 @@ def get_raw( request, url ):
 	"""Tries to retrieve the HAR, returning a 500 if timing out."""
 	try:
 		json = get_har( url )
-	except timeout_decorator.timeout_decorator.TimeoutError as t:
+	except TimeoutException as t:
 		return HttpResponseServerError( content=str( t ) )
 	return HttpResponse( content=json, mimetype="application/json" )
 
@@ -80,7 +103,7 @@ def get_urls( request, url ):
 	"""Tries to retrieve a list of URLs, returning a 500 if timing out."""
 	try:
 		response = generate_urls( url )
-	except timeout_decorator.timeout_decorator.TimeoutError as t:
+	except TimeoutException as t:
 		return HttpResponseServerError( content=str( t ) )
 	return HttpResponse( content=response, mimetype="text/plain" )
 
@@ -90,7 +113,7 @@ def get_image_and_urls( request, url ):
 	try:
 		image = base64.b64encode( generate_image( url ) )
 		urls = generate_urls( url )
-	except timeout_decorator.timeout_decorator.TimeoutError as t:
+	except TimeoutException as t:
 		return HttpResponseServerError( content=str( t ) )
 	data = [ { 'image':image, 'urls':urls } ]
 	json_string = simplejson.dumps( data )
@@ -106,8 +129,9 @@ def get_dom_image( request, url ):
 			har = get_har_with_image( url, selectors )
 		else:
 			har = get_har_with_image( url )
-	except timeout_decorator.timeout_decorator.TimeoutError as t:
+	except TimeoutException as t:
 		return HttpResponseServerError( content=str( t ) )
 	if har.startswith( "FAIL" ):
 		return HttpResponseServerError( content="%s" % har, mimetype="text/plain" )
-	r = Popen( command, stdout=PIPE, stderr=PIPE )return HttpResponse( content=har, mimetype="application/json" )
+	return HttpResponse( content=har, mimetype="application/json" )
+
