@@ -4,6 +4,9 @@
  * images of particular elements within a page, in the output.
  *
  * This breaks the HAR spec. as it currently stands.
+ *
+ * Asynchronous rendering borrowed from:
+ * https://gist.github.com/cjoudrey/1341747
  */
 
 if (!Date.prototype.toISOString) {
@@ -123,7 +126,7 @@ function createHAR(address, title, startTime, resources, b64_content, selectors 
 
 	return {
 		log: {
-			version: '0.0.1',
+			version: '0.0.2',
 			creator: {
 				name: "PhantomJS",
 				version: phantom.version.major + '.' + phantom.version.minor +
@@ -147,14 +150,30 @@ function createHAR(address, title, startTime, resources, b64_content, selectors 
 	};
 }
 
+var doRender = function () {
+	page.endTime = new Date();
+	page.title = page.evaluate( function () {
+		return document.title;
+	} );
+	var selectors = [ phantom.args.slice( 1 ) ];
+	var b64_content = window.btoa( unescape( encodeURIComponent( page.content ) ) );
+	var har = createHAR( page.address, page.title, page.startTime, page.resources, b64_content, selectors );
+	console.log( JSON.stringify( har, undefined, 4 ) );
+	phantom.exit();
+};
+
 var page = require('webpage').create(),
-	system = require('system');
+	system = require('system'),
+	count = 0,
+	resourceWait  = 500, 
+	maxRenderWait = 30000,
+	forcedRenderTimeout,
+	renderTimeout;
 
 if (system.args.length === 1) {
 	console.log('Usage: netsniff-rasterize.js URL selectors...');
 	phantom.exit(1);
 } else {
-
 	page.address = system.args[1];
 	page.resources = [];
 
@@ -163,11 +182,13 @@ if (system.args.length === 1) {
 	};
 
 	page.onResourceRequested = function (req) {
+		count += 1;
 		page.resources[req.id] = {
 			request: req,
 			startReply: null,
 			endReply: null
 		};
+		clearTimeout( renderTimeout );
 	};
 
 	page.onResourceReceived = function (res) {
@@ -176,6 +197,12 @@ if (system.args.length === 1) {
 		}
 		if (res.stage === 'end') {
 			page.resources[res.id].endReply = res;
+		}
+		 if( !res.stage || res.stage === "end" ) {
+			count -= 1;
+			if( count === 0 ) {
+				renderTimeout = setTimeout( doRender, resourceWait );
+			}
 		}
 	};
 
@@ -186,19 +213,10 @@ if (system.args.length === 1) {
 			console.log('FAIL to load the address');
 			phantom.exit(1);
 		} else {
-			window.setTimeout( function () {
-				page.endTime = new Date();
-				page.title = page.evaluate(function () {
-					return document.title;
-				});
-				var selectors = phantom.args.slice( 1 );
-				var b64_content = window.btoa( unescape( encodeURIComponent( page.content ) ) );
-				var har = createHAR( page.address, page.title, page.startTime, page.resources, b64_content, selectors );
-				console.log(JSON.stringify(har, undefined, 4));
-				phantom.exit();
-			}, 200 );
+			forcedRenderTimeout = setTimeout( function () {
+				doRender();
+			}, maxRenderWait );
 		}
 	});
 }
-
 
