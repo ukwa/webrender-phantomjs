@@ -1,7 +1,8 @@
-phantomjs = "/opt/phantomjs/bin/phantomjs"
-rasterize = "/opt/phantomjs/examples/rasterize.js"
-netsniff = "/opt/phantomjs/examples/netsniff.js"
-domimage = "/opt/phantomjs/examples/netsniff-rasterize.js"
-temp = "/dev/shm/"
+root = "/dev/shm/phantomjs"
+phantomjs = "%s/bin/phantomjs" % root
+rasterize = "%s/examples/rasterize.js" % root
+netsniff = "%s/examples/netsniff.js" % root
+domimage = "%s/examples/netsniff-rasterize.js" % root
+temp = "/dev/shm/" % root
 timeout_limit = 30
 
