@@ -49,10 +49,9 @@ captureSelector = function( selector ) {
 	}
 }
 
-function createHAR(address, title, startTime, resources, b64_content, selectors )
+function createHAR(address, title, startTime, resources, b64_content, selectors, clickables )
 {
 	var entries = [];
-
 	resources.forEach(function (resource) {
 		var request = resource.request,
 			startReply = resource.startReply,
@@ -123,7 +122,6 @@ function createHAR(address, title, startTime, resources, b64_content, selectors 
 		}
 	} );
 
-
 	return {
 		log: {
 			version: '0.0.2',
@@ -143,7 +141,8 @@ function createHAR(address, title, startTime, resources, b64_content, selectors 
 					text: b64_content,
 					encoding: "base64"
 				},
-				renderedElements: renderedElements
+				renderedElements: renderedElements,
+				map: clickables
 			}],
 			entries: entries
 		}
@@ -155,9 +154,29 @@ var doRender = function () {
 	page.title = page.evaluate( function () {
 		return document.title;
 	} );
+	var clickables = page.evaluate( function() {
+		var clickables = [];
+		var elements = Array.prototype.slice.call( document.getElementsByTagName( "*" ) );
+		elements.forEach( function( element ) {
+			if( element.offsetParent != null ) {
+				if( element.onclick != null || element.attributes[ "href" ] != undefined ) {
+					var c = {};
+					c.location = element.getBoundingClientRect();
+					if( element.attributes[ "href" ] != undefined ) {
+						c.href = element.attributes[ "href" ].textContent;
+					}
+					if( element.onclick != null ) {
+						c.onclick = element.onclick.toString();
+					}
+					clickables.push( c );
+				}
+			}
+		} );
+		return clickables;
+	} );
 	var selectors = [ phantom.args.slice( 1 ) ];
 	var b64_content = window.btoa( unescape( encodeURIComponent( page.content ) ) );
-	var har = createHAR( page.address, page.title, page.startTime, page.resources, b64_content, selectors );
+	var har = createHAR( page.address, page.title, page.startTime, page.resources, b64_content, selectors, clickables );
 	console.log( JSON.stringify( har, undefined, 4 ) );
 	phantom.exit();
 };
