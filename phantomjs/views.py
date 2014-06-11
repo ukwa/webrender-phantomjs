@@ -10,6 +10,7 @@ from phantomjs.settings import *
 from subprocess import Popen, PIPE
 from django.views.decorators.gzip import gzip_page
 from django.views.decorators.csrf import csrf_exempt
+from django.views.decorators.cache import cache_page
 from django.http import HttpResponse, HttpResponseServerError
 
 logger = logging.getLogger( "phantomjs.views" )
@@ -75,6 +76,7 @@ def get_har( url ):
 	return strip_debug( stdout )
 
 @timeout( timeout_limit )
+@cache_page( 60 * 60 * 24 )
 def get_har_with_image( url, selectors=None ):
 	"""Gets the raw HAR output from PhantomJs with rendered image(s)."""
 	command = [ phantomjs, domimage, url ]
