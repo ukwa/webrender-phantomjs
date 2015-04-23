@@ -1,9 +1,4 @@
-from django.conf.urls.defaults import *
-
-from django.contrib import admin
-admin.autodiscover()
-
-CACHE_PERIOD = 60 * 60 * 24
+from django.conf.urls import patterns, include, url
 
 urlpatterns = patterns( 'phantomjs.views',
 	( r'^image/(?P<url>.*)$', 'get_image' ),
