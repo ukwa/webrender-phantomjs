@@ -35,7 +35,7 @@ def get_image( request, url ):
 def strip_debug( js ):
     """PhantomJs seems to merge its output with its error messages; this
     tries to strip them."""
-    lines = str(js).splitlines()
+    lines = js.decode("utf-8").splitlines()
     for index, line in enumerate( lines ):
         if line.startswith( "{" ):
             return "\n".join( lines[ index: ] )
