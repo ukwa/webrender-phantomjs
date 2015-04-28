@@ -86,8 +86,8 @@ def get_image_and_urls( request, url ):
 @csrf_exempt
 def get_dom_image( request, url ):
     """Tries to retrieve the HAR with rendered images, returning a 500 if timing out."""
-    if request.method == "POST":
-        selectors = request.POST.values()
+    if request.method == "POST" and request.body:
+        selectors = json.loads(request.body.decode("utf-8"))
         har = get_har_with_image( url, selectors )
     else:
         har = get_har_with_image( url )
