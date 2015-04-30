@@ -23,33 +23,33 @@ if (!Date.prototype.toISOString) {
 	}
 }
 
-capture = function( clipRect ) {
-	if ( clipRect ) {
-		 if ( !typeof( clipRect ) === "object" ) {
-			throw new Error( "clipRect must be an Object instance." );
+capture = function(clipRect) {
+	if (clipRect) {
+		 if (!typeof(clipRect) === "object") {
+			throw new Error("clipRect must be an Object instance.");
 		}
 	}
 	try {
 		page.clipRect = clipRect;
-		return page.renderBase64( "PNG" );
-	} catch ( e ) {
-		console.log( "Failed to capture screenshot: " + e, "error" );
+		return page.renderBase64("PNG");
+	} catch (e) {
+		console.log("Failed to capture screenshot: " + e, "error");
 	}
 }
 
-captureSelector = function( selector ) {
-	var clipRect = page.evaluate( function( selector ) {
-		var e = document.querySelector( selector );
-		if( e != null ) {
-			return document.querySelector( selector ).getBoundingClientRect();
+captureSelector = function(selector) {
+	var clipRect = page.evaluate(function(selector) {
+		var e = document.querySelector(selector);
+		if(e != null) {
+			return document.querySelector(selector).getBoundingClientRect();
 		}
-	}, selector );
-	if( clipRect != null ) {
-		return capture( clipRect );
+	}, selector);
+	if(clipRect != null) {
+		return capture(clipRect);
 	}
 }
 
-function createHAR(address, title, startTime, resources, b64_content, selectors, clickables )
+function createHAR(address, title, startTime, resources, b64_content, selectors, clickables)
 {
 	var entries = [];
 	resources.forEach(function (resource) {
@@ -110,17 +110,17 @@ function createHAR(address, title, startTime, resources, b64_content, selectors,
 	});
 
 	var renderedElements = [];
-	selectors.forEach( function( selector ) {
-		var image = captureSelector( selector );
-		if( image != null ) {
-			renderedElements.push( {
+	selectors.forEach(function(selector) {
+		var image = captureSelector(selector);
+		if(image != null) {
+			renderedElements.push({
 				selector: selector,
 				format: "PNG",
 				content: image,
 				encoding: "base64"
-			} );
+			});
 		}
-	} );
+	});
 
 	return {
 		log: {
@@ -151,33 +151,33 @@ function createHAR(address, title, startTime, resources, b64_content, selectors,
 
 var doRender = function () {
 	page.endTime = new Date();
-	page.title = page.evaluate( function () {
+	page.title = page.evaluate(function () {
 		return document.title;
-	} );
-	var clickables = page.evaluate( function() {
+	});
+	var clickables = page.evaluate(function() {
 		var clickables = [];
-		var elements = Array.prototype.slice.call( document.getElementsByTagName( "*" ) );
-		elements.forEach( function( element ) {
-			if( element.offsetParent != null ) {
-				if( element.onclick != null || element.attributes[ "href" ] != undefined ) {
+		var elements = Array.prototype.slice.call(document.getElementsByTagName("*"));
+		elements.forEach(function(element) {
+			if(element.offsetParent != null) {
+				if(element.onclick != null || element.attributes["href"] != undefined) {
 					var c = {};
 					c.location = element.getBoundingClientRect();
-					if( element.attributes[ "href" ] != undefined ) {
-						c.href = element.attributes[ "href" ].textContent;
+					if(element.attributes["href"] != undefined) {
+						c.href = element.attributes["href"].textContent;
 					}
-					if( element.onclick != null ) {
+					if(element.onclick != null) {
 						c.onclick = element.onclick.toString();
 					}
-					clickables.push( c );
+					clickables.push(c);
 				}
 			}
-		} );
+		});
 		return clickables;
-	} );
-	var selectors = phantom.args.slice( 1 );
-	var b64_content = window.btoa( unescape( encodeURIComponent( page.content ) ) );
-	var har = createHAR( page.address, page.title, page.startTime, page.resources, b64_content, selectors, clickables );
-	console.log( JSON.stringify( har, undefined, 4 ) );
+	});
+	var selectors = phantom.args.slice(1);
+	var b64_content = window.btoa(unescape(encodeURIComponent(page.content)));
+	var har = createHAR(page.address, page.title, page.startTime, page.resources, b64_content, selectors, clickables);
+	console.log(JSON.stringify(har, undefined, 4));
 	phantom.exit();
 };
 
@@ -207,7 +207,7 @@ if (system.args.length === 1) {
 			startReply: null,
 			endReply: null
 		};
-		clearTimeout( renderTimeout );
+		clearTimeout(renderTimeout);
 	};
 
 	page.onResourceReceived = function (res) {
@@ -217,10 +217,16 @@ if (system.args.length === 1) {
 		if (res.stage === 'end') {
 			page.resources[res.id].endReply = res;
 		}
-		 if( !res.stage || res.stage === "end" ) {
+		 if(!res.stage || res.stage === "end") {
 			count -= 1;
-			if( count === 0 ) {
-				renderTimeout = setTimeout( doRender, resourceWait );
+			page.viewportSize = {
+				width: 1280,
+				height: page.evaluate(function() {
+					return document.body.scrollHeight;
+				})
+			};
+			if(count === 0) {
+				renderTimeout = setTimeout(doRender, resourceWait);
 			}
 		}
 	};
@@ -232,10 +238,9 @@ if (system.args.length === 1) {
 			console.log('FAIL to load the address');
 			phantom.exit(1);
 		} else {
-			forcedRenderTimeout = setTimeout( function () {
+			forcedRenderTimeout = setTimeout(function () {
 				doRender();
-			}, maxRenderWait );
+			}, maxRenderWait);
 		}
 	});
 }
-
