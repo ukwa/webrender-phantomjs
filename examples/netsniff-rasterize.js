@@ -174,7 +174,7 @@ var doRender = function () {
         });
         return clickables;
     });
-    var output = phantom.args[2];
+    var output = phantom.args[1];
     var selectors = phantom.args.slice(2);
     var b64_content = window.btoa(unescape(encodeURIComponent(page.content)));
     var har = createHAR(page.address, page.title, page.startTime, page.resources, b64_content, selectors, clickables);
