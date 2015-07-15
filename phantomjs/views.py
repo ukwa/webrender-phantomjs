@@ -55,6 +55,8 @@ def get_har_with_image(url, selectors=None):
         command += selectors
     har = Popen(command, stdout=PIPE, stderr=PIPE)
     stdout, stderr = har.communicate()
+    if not os.path.exists(tmp):
+        return "FAIL"
     with open(tmp, "r") as i:
         output = i.read()
     os.remove(tmp)
