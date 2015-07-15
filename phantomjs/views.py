@@ -55,7 +55,7 @@ def get_har_with_image(url, selectors=None):
         command += selectors
     har = Popen(command, stdout=PIPE, stderr=PIPE)
     stdout, stderr = har.communicate()
-    with open(tmp, "rb") as i:
+    with open(tmp, "r") as i:
         output = i.read()
     os.remove(tmp)
     return output
