@@ -89,7 +89,11 @@ def get_image_and_urls(request, url):
 @gzip_page
 @csrf_exempt
 def get_dom_image(request, url):
-    """Tries to retrieve the HAR with rendered images, returning a 500 if timing out."""
+    """
+    Tries to retrieve the HAR with rendered images, returning a 500 if timing out.
+    If data is POST'd it expects a string-representation of a list of selectors, e.g.:
+    "[\":root\"]"
+    """
     if request.method == "POST" and request.body:
         selectors = json.loads(request.body.decode("utf-8"))
         har = get_har_with_image(url, selectors)
