@@ -15,3 +15,16 @@ A Django app. which wraps PhantomJs.
 
 The examples directory contains the actual PhantomJS scripts. The scripts directory contains various Python scripts for sending/receiving data.
 
+This application largely depends on the PhantomJS scripts that are supplied with PhantomJS itself.
+
+Running the application
+-----------------------
+
+For development purposes, run
+
+    $ python manage.py runserver
+
+and go to http://127.0.0.1:8000/webtools
+
+
+
