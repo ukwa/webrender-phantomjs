@@ -14,15 +14,19 @@ from django.views.decorators.csrf import csrf_exempt
 from django.http import HttpResponse, HttpResponseServerError
 
 logger = logging.getLogger("phantomjs.views")
+logger.setLevel(logging.DEBUG)
 
 def generate_image(url):
     """Returns a 1280x960 rendering of the webpage."""
     tmp = "%s/%s.jpg" % (temp, str(random.randint(0, 100)))
-    image = Popen([phantomjs, rasterize, url, tmp], stdout=PIPE, stderr=PIPE)
+    image = Popen([phantomjs, rasterize, url, tmp, "1280px"], stdout=PIPE, stderr=PIPE)
     stdout, stderr = image.communicate()
-    im = Image.open(tmp)
-    crop = im.crop((0, 0, 1280, 960))
-    crop.save(tmp, "JPEG")
+    logger.info("phantomjs.info: %s" % stdout)
+    logger.error("phantomjs.error: %s" % stderr)
+    if crop_rasterize_image:
+        im = Image.open(tmp)
+        crop = im.crop((0, 0, 1280, 960))
+        crop.save(tmp, "JPEG")
     data = open(tmp, "rb").read()
     os.remove(tmp)
     return data
