@@ -163,7 +163,8 @@ var doRender = function () {
                     var c = {};
                     c.location = element.getBoundingClientRect();
                     if(element.attributes["href"] != undefined) {
-                        c.href = element.attributes["href"].textContent;
+                        // Get absolute URL:
+                        c.href = element.href;
                     }
                     if(element.onclick != null) {
                         c.onclick = element.onclick.toString();
@@ -174,8 +175,12 @@ var doRender = function () {
         });
         return clickables;
     });
-    var output = phantom.args[1];
-    var selectors = phantom.args.slice(2);
+    var output = system.args[2];
+    var selectors = system.args.slice(3);
+    // Default to rendering the root element:
+    if( selectors.length == 0 ) {
+        selectors = [":root"]
+    }
     var b64_content = window.btoa(unescape(encodeURIComponent(page.content)));
     var har = createHAR(page.address, page.title, page.startTime, page.resources, b64_content, selectors, clickables);
     fs.write(output, JSON.stringify(har, undefined, 4), "w");

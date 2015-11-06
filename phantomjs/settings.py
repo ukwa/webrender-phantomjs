@@ -1,8 +1,8 @@
 root = "/usr/local"
 phantomjs = "%s/bin/phantomjs" % root
-rasterize = "%s/share/phantomjs/examples/rasterize.js" % root
+rasterize = "./examples/rasterize.js"
 netsniff = "%s/share/phantomjs/examples/netsniff.js" % root
-domimage = "%s/share/phantomjs/examples/netsniff-rasterize.js" % root
+domimage = "./examples/netsniff-rasterize.js"
 temp = "/var/tmp"
 timeout_limit = 30
 crop_rasterize_image = True
