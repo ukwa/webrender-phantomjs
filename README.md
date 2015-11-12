@@ -3,7 +3,7 @@ django-phantomjs
 
 A Django app. which wraps PhantomJs.
 
-    image/<URL>     Render an image of the URL in question (rasterize.js)
+    image/<URL>     Render an PNG image of the URL in question (rasterize.js)
     traffic/<URL>   Return JSON-formatted details of network traffic (netsniff.js)
     urls/<URL>      As with 'traffic' but return a simple list of URLs (netsniff.js)
     imageurls/<URL> Returns a JSON structure containing the same output as "/urls/" and a Base64-encoded 
@@ -26,5 +26,8 @@ For development purposes, run
 
 and go to http://127.0.0.1:8000/webtools
 
+For [production deployment](https://docs.djangoproject.com/en/1.8/howto/deployment/), an example [gunicorn](http://docs.gunicorn.org/en/latest/install.html) configuration is included:
+
+    $ gunicorn -c gunicorn.ini wsgi:application
 
 
