@@ -18,17 +18,21 @@ logger.setLevel(logging.DEBUG)
 
 def generate_image(url):
     """Returns a 1280x960 rendering of the webpage."""
-    tmp = "%s/%s.jpeg" % (temp, str(random.randint(0, 1000000)))
-    image = Popen([phantomjs, rasterize, url, tmp, "1280px"], stdout=PIPE, stderr=PIPE)
+    logger.debug("Rendering: %s..." %url)
+    tmp = "%s/%s.png" % (temp, str(random.randint(0, 100000000)))
+    cmd = [phantomjs, rasterize, url, tmp, "1280px"]
+    logger.debug("Using command: %s " % " ".join(cmd))
+    image = Popen(cmd, stdout=PIPE, stderr=PIPE)
     stdout, stderr = image.communicate()
     if stdout:
-        logger.info("phantomjs.info: %s" % stdout)
+        logger.debug("phantomjs.info: %s" % stdout)
     if stderr:
-        logger.error("phantomjs.error: %s" % stderr)
+        logger.debug("phantomjs.error: %s" % stderr)
     if crop_rasterize_image:
         im = Image.open(tmp)
         crop = im.crop((0, 0, 1280, 1024))
-        crop.save(tmp, format='JPEG', subsampling=0, quality=100)
+        crop.save(tmp, format='PNG')
+        logger.debug("Cropped.")
     data = open(tmp, "rb").read()
     os.remove(tmp)
     return data
@@ -36,7 +40,7 @@ def generate_image(url):
 def get_image(request, url):
     """Tries to render an image of a URL, returning a 500 if it times out."""
     data = generate_image(url)
-    return HttpResponse(content=data, content_type="image/jpeg")
+    return HttpResponse(content=data, content_type="image/png")
 
 def strip_debug(js):
     """PhantomJs seems to merge its output with its error messages; this
@@ -55,7 +59,7 @@ def get_har(url):
 
 def get_har_with_image(url, selectors=None):
     """Gets the raw HAR output from PhantomJs with rendered image(s)."""
-    tmp = "%s/%s.json" % (temp, str(random.randint(0, 100)))
+    tmp = "%s/%s.json" % (temp, str(random.randint(0, 100000000)))
     command = [phantomjs, domimage, url, tmp]
     if selectors is not None:
         command += selectors
