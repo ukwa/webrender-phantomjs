@@ -20,7 +20,7 @@ def generate_image(url):
     """Returns a 1280x960 rendering of the webpage."""
     logger.debug("Rendering: %s..." %url)
     tmp = "%s/%s.png" % (temp, str(random.randint(0, 100000000)))
-    cmd = [phantomjs, rasterize, url, tmp, "1280px"]
+    cmd = [phantomjs, "--ssl-protocol=any", rasterize, url, tmp, "1280px"]
     logger.debug("Using command: %s " % " ".join(cmd))
     image = Popen(cmd, stdout=PIPE, stderr=PIPE)
     stdout, stderr = image.communicate()
@@ -53,14 +53,14 @@ def strip_debug(js):
 
 def get_har(url):
     """Gets the raw HAR output from PhantomJs."""
-    har = Popen([phantomjs, netsniff, url], stdout=PIPE, stderr=PIPE)
+    har = Popen([phantomjs, "--ssl-protocol=any", netsniff, url], stdout=PIPE, stderr=PIPE)
     stdout, stderr = har.communicate()
     return strip_debug(stdout)
 
 def get_har_with_image(url, selectors=None):
     """Gets the raw HAR output from PhantomJs with rendered image(s)."""
     tmp = "%s/%s.json" % (temp, str(random.randint(0, 100000000)))
-    command = [phantomjs, domimage, url, tmp]
+    command = [phantomjs, "--ssl-protocol=any", domimage, url, tmp]
     if selectors is not None:
         command += selectors
     har = Popen(command, stdout=PIPE, stderr=PIPE)

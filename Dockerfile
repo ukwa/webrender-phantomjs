@@ -18,9 +18,7 @@ RUN \
   yum -y install fontconfig libfontenc fontconfig-devel \
   libXfont ghostscript-fonts xorg-x11-font-utils urw-fonts
 
-RUN \
-  git config --global http.sslVerify false && \
-  git clone https://github.com/ukwa/django-phantomjs.git
+COPY webrender /django-phantomjs
 
 COPY settings.py /django-phantomjs/phantomjs/
 
