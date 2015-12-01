@@ -20,6 +20,10 @@ This application largely depends on the PhantomJS scripts that are supplied with
 Running the application
 -----------------------
 
+The application runs out of the webrender folder:
+
+    $ cd webrender
+
 For development purposes, run
 
     $ python manage.py runserver
