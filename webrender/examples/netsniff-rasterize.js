@@ -124,7 +124,7 @@ function createHAR(address, title, startTime, resources, b64_content, selectors,
 
     return {
         log: {
-            version: '0.0.2',
+            version: '0.0.3',
             creator: {
                 name: "PhantomJS",
                 version: phantom.version.major + '.' + phantom.version.minor +
@@ -148,6 +148,7 @@ function createHAR(address, title, startTime, resources, b64_content, selectors,
         }
     };
 }
+
 
 var doRender = function () {
     page.endTime = new Date();
@@ -187,10 +188,15 @@ var doRender = function () {
     phantom.exit();
 };
 
+var autoScroller = function() {
+    page.scrollPosition = { top: page.scrollPosition.top + 900, left: 0 };
+    setTimeout(autoScroller, 250);
+};
+
 var page = require('webpage').create(),
     system = require('system'),
     count = 0,
-    resourceWait  = 500, 
+    resourceWait  = 2000, 
     maxRenderWait = 30000,
     forcedRenderTimeout,
     renderTimeout;
@@ -224,14 +230,32 @@ if (system.args.length === 1) {
         if (res.stage === 'end') {
             page.resources[res.id].endReply = res;
         }
-         if(!res.stage || res.stage === "end") {
+        //
+         if(!res.stage || res.stage === 'end') {
+            //console.log("Current count: "+count);
             count -= 1;
+            scrollHeight = page.evaluate(function() {
+                    if( document.body != null) {
+                      return document.body.scrollHeight; 
+                    } else {
+                      return 0;
+                    }
+            });
+            scrollPosition = page.evaluate(function() {
+                    if( document.body != null) {
+                        //document.body.scrollTop += 430;
+                      return document.body.scrollTop; 
+                    } else {
+                      return 0;
+                    }
+            });
+            //console.log("Got scrollHeight: "+scrollHeight+" and scrollPosition: "+scrollPosition);
             page.viewportSize = {
                 width: 1280,
-                height: page.evaluate(function() {
-                    return document.body.scrollHeight;
-                })
-            };
+                height: scrollHeight
+                };
+
+            // 
             if(count === 0) {
                 renderTimeout = setTimeout(doRender, resourceWait);
             }
@@ -245,9 +269,15 @@ if (system.args.length === 1) {
             console.log('FAIL to load the address');
             phantom.exit(1);
         } else {
+            // Set the timeout till forcing a render:
             forcedRenderTimeout = setTimeout(function () {
+                console.log("Forcing rendering to complete...")
                 doRender();
             }, maxRenderWait);
         }
     });
+
+    // Attempt to auto-scroll down:
+    autoScroller();
+
 }

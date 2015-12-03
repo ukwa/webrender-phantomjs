@@ -1,5 +1,6 @@
 import os
 import re
+import sys
 import json
 import base64
 import random
@@ -13,7 +14,10 @@ from django.views.decorators.gzip import gzip_page
 from django.views.decorators.csrf import csrf_exempt
 from django.http import HttpResponse, HttpResponseServerError
 
+handler = logging.StreamHandler()
+
 logger = logging.getLogger("phantomjs.views")
+logger.addHandler(handler)
 logger.setLevel(logging.DEBUG)
 
 def generate_image(url):
