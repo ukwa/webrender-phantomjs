@@ -6,4 +6,4 @@ domimage = "/django-phantomjs/examples/netsniff-rasterize.js"
 temp = "/var/tmp"
 timeout_limit = 30
 crop_rasterize_image = True
-
+owb_proxy="openwayback:8090"

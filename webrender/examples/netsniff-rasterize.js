@@ -189,8 +189,18 @@ var doRender = function () {
 };
 
 var autoScroller = function() {
-    page.scrollPosition = { top: page.scrollPosition.top + 900, left: 0 };
-    setTimeout(autoScroller, 250);
+    // Scroll up
+    page.scrollPosition = { top: page.scrollPosition.top + 500, left: 0 };
+    scrollPosition = page.evaluate(function() {
+        if( document.body != null) {
+          return document.body.scrollTop; 
+        } else {
+          return 0;
+        }
+    });
+    //console.log("Got scrollPosition: "+scrollPosition);
+
+    setTimeout(autoScroller, 200);
 };
 
 var page = require('webpage').create(),
@@ -215,6 +225,7 @@ if (system.args.length === 1) {
 
     page.onResourceRequested = function (req) {
         count += 1;
+        //console.log("Request initiated, so total = "+count);
         page.resources[req.id] = {
             request: req,
             startReply: null,
@@ -232,31 +243,24 @@ if (system.args.length === 1) {
         }
         //
          if(!res.stage || res.stage === 'end') {
-            //console.log("Current count: "+count);
             count -= 1;
-            scrollHeight = page.evaluate(function() {
-                    if( document.body != null) {
-                      return document.body.scrollHeight; 
-                    } else {
-                      return 0;
-                    }
-            });
-            scrollPosition = page.evaluate(function() {
-                    if( document.body != null) {
-                        //document.body.scrollTop += 430;
-                      return document.body.scrollTop; 
-                    } else {
-                      return 0;
-                    }
-            });
-            //console.log("Got scrollHeight: "+scrollHeight+" and scrollPosition: "+scrollPosition);
-            page.viewportSize = {
-                width: 1280,
-                height: scrollHeight
-                };
+            //console.log("Request complete, so total = "+count);
 
-            // 
+            // If all requests have been resolved - re-fit the viewport:
             if(count === 0) {
+                scrollHeight = page.evaluate(function() {
+                        if( document.body != null) {
+                          return document.body.scrollHeight; 
+                        } else {
+                          return 0;
+                        }
+                });
+                console.log("Resizing viewport to scrollHeight: "+scrollHeight);
+                page.viewportSize = {
+                    width: 1280,
+                    height: scrollHeight
+                };
+                // Render the result, but wait in case more resources turn up.
                 renderTimeout = setTimeout(doRender, resourceWait);
             }
         }

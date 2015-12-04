@@ -17,14 +17,21 @@ from django.http import HttpResponse, HttpResponseServerError
 handler = logging.StreamHandler()
 
 logger = logging.getLogger("phantomjs.views")
-logger.addHandler(handler)
+#logger.addHandler(handler)
 logger.setLevel(logging.DEBUG)
 
-def generate_image(url):
+# --proxy=XXX.XXX:9090
+def phantomjs_cmd(proxy=None):
+    cmd = [phantomjs, "--ssl-protocol=any"]
+    if proxy:
+        cmd = cmd + [ "--proxy=%s" % proxy ]
+    return cmd
+
+def generate_image(url, proxy=None):
     """Returns a 1280x960 rendering of the webpage."""
     logger.debug("Rendering: %s..." %url)
     tmp = "%s/%s.png" % (temp, str(random.randint(0, 100000000)))
-    cmd = [phantomjs, "--ssl-protocol=any", rasterize, url, tmp, "1280px"]
+    cmd = phantomjs_cmd(proxy) + [rasterize, url, tmp, "1280px"]
     logger.debug("Using command: %s " % " ".join(cmd))
     image = Popen(cmd, stdout=PIPE, stderr=PIPE)
     stdout, stderr = image.communicate()
@@ -40,6 +47,12 @@ def generate_image(url):
     data = open(tmp, "rb").read()
     os.remove(tmp)
     return data
+
+def get_image_proxy(request, url):
+    """Tries to render an image of a URL, taken via the proxy, returning a 500 if it times out."""
+    data = generate_image(url, proxy=owb_proxy)
+    return HttpResponse(content=data, content_type="image/png")
+
 
 def get_image(request, url):
     """Tries to render an image of a URL, returning a 500 if it times out."""
@@ -57,14 +70,15 @@ def strip_debug(js):
 
 def get_har(url):
     """Gets the raw HAR output from PhantomJs."""
-    har = Popen([phantomjs, "--ssl-protocol=any", netsniff, url], stdout=PIPE, stderr=PIPE)
+    har = Popen(phantomjs_cmd() + [netsniff, url], stdout=PIPE, stderr=PIPE)
     stdout, stderr = har.communicate()
     return strip_debug(stdout)
 
 def get_har_with_image(url, selectors=None):
     """Gets the raw HAR output from PhantomJs with rendered image(s)."""
     tmp = "%s/%s.json" % (temp, str(random.randint(0, 100000000)))
-    command = [phantomjs, "--ssl-protocol=any", domimage, url, tmp]
+    command = phantomjs_cmd() + [domimage, url, tmp]
+    logger.debug("Using command: %s " % " ".join(command))
     if selectors is not None:
         command += selectors
     har = Popen(command, stdout=PIPE, stderr=PIPE)
