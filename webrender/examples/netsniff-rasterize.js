@@ -31,9 +31,11 @@ capture = function(clipRect) {
     }
     try {
         page.clipRect = clipRect;
-        return page.renderBase64("PNG");
+        console.log("INFO: Rendering to clipped region... "+page.clipRect.top+", "+page.clipRect.left+": "+page.clipRect.width+" x "+page.clipRect.height);
+        page.render("pjs-test.png");
+        return page.renderBase64('PNG');
     } catch (e) {
-        console.log("Failed to capture screenshot: " + e, "error");
+        console.log("ERROR: Failed to capture screenshot: " + e, "error");
     }
 }
 
@@ -109,6 +111,10 @@ function createHAR(address, title, startTime, resources, b64_content, selectors,
         });
     });
 
+    // Reset to the full viewport:
+    setToFullViewport();
+
+    // Render selected elements:
     var renderedElements = [];
     selectors.forEach(function(selector) {
         var image = captureSelector(selector);
@@ -185,12 +191,32 @@ var doRender = function () {
     var b64_content = window.btoa(unescape(encodeURIComponent(page.content)));
     var har = createHAR(page.address, page.title, page.startTime, page.resources, b64_content, selectors, clickables);
     fs.write(output, JSON.stringify(har, undefined, 4), "w");
+
     phantom.exit();
 };
 
+var setToFullViewport = function() {
+    // Reset scroll position (or you get a big blank image):
+    page.scrollPosition = { top: 0, left: 0 };
+
+    // Get the scrollHeight:
+    scrollHeight = page.evaluate(function() {
+            if( document.body != null) {
+              return document.body.scrollHeight; 
+            } else {
+              return 0;
+            }
+    });
+    if(scrollHeight == 0) return;
+    console.log("INFO: Resizing viewport to scrollHeight: "+scrollHeight);
+    page.viewportSize = {
+        width: 1280,
+        height: scrollHeight
+    };
+}
+
 var autoScroller = function() {
-    // Scroll up
-    page.scrollPosition = { top: page.scrollPosition.top + 500, left: 0 };
+    // Scroll down...
     scrollPosition = page.evaluate(function() {
         if( document.body != null) {
           return document.body.scrollTop; 
@@ -198,7 +224,8 @@ var autoScroller = function() {
           return 0;
         }
     });
-    //console.log("Got scrollPosition: "+scrollPosition);
+    //console.log("INFO: Current scrollPosition: "+scrollPosition);
+    page.scrollPosition = { top: scrollPosition+200, left: 0 };
 
     setTimeout(autoScroller, 200);
 };
@@ -218,6 +245,38 @@ if (system.args.length === 1) {
 } else {
     page.address = system.args[1];
     page.resources = [];
+
+    // Set up optional user agent and target datetime from the environment.
+    var env = system.env;
+
+    /*
+    Object.keys(env).forEach(function(key) {
+      console.log(key + '=' + env[key]);
+    });
+    console.log("--------");
+    */
+
+    // Add optional userAgent override:
+    if( 'phantomjs_userAgent' in env ) {
+        page.settings.userAgent = env['phantomjs_userAgent'];
+        // e.g. 'Mozilla/5.0 (Windows NT 6.1; WOW64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/37.0.2062.120 Safari/537.36';
+    }
+    // Set up an object for customHeaders:
+    headers = {}
+    // Add Memento Datetime header if needed:
+    if( 'phantomjs_accept_datetime' in env ) {
+        headers['Accept-Datetime'] = env['phantomjs_accept_datetime']
+    }
+    // Accept-Datetime: Thu, 31 May 2007 20:35:00 GMT
+    // Add a crawl identifier if needed:
+    if( 'phantomjs_crawl_id' in env ) {
+        headers['Crawl-ID'] = env['phantomjs_crawl_id'];
+    }
+    // And assign:
+    page.customHeaders = headers;
+    for(var key in page.customHeaders) {
+      console.log('Custom header: ' + key + '=' + page.customHeaders[key]);
+    };
 
     page.onLoadStarted = function () {
         page.startTime = new Date();
@@ -248,40 +307,49 @@ if (system.args.length === 1) {
 
             // If all requests have been resolved - re-fit the viewport:
             if(count === 0) {
-                scrollHeight = page.evaluate(function() {
-                        if( document.body != null) {
-                          return document.body.scrollHeight; 
-                        } else {
-                          return 0;
-                        }
-                });
-                console.log("Resizing viewport to scrollHeight: "+scrollHeight);
-                page.viewportSize = {
-                    width: 1280,
-                    height: scrollHeight
-                };
+                // Optionally, keep resizing the viewport to be the whole page:
+                // Current model is to autoscroll and do this at the end.
+                // setToFullViewport();
                 // Render the result, but wait in case more resources turn up.
                 renderTimeout = setTimeout(doRender, resourceWait);
             }
         }
     };
 
-    page.viewportSize = { width: 1280, height: 960 };
+    page.onLoadFinished = function() {
+        console.log("INFO: onLoadFinished.");
+    };
+
+    page.onError = function (msg, trace) {
+        console.log("ERROR:",msg);
+        trace.forEach(function(item) {
+            console.log("ERROR:", item.file, ':', item.line);
+        })
+    };    
+
+    page.onConsoleError = function (msg, trace) {
+        console.log("ERROR:",msg);
+        trace.forEach(function(item) {
+            console.log("ERROR:", item.file, ':', item.line);
+        })
+    };    
+
+    page.viewportSize = { width: 1280, height: 1024 };
 
     page.open(page.address, function (status) {
         if (status !== 'success') {
-            console.log('FAIL to load the address');
+            console.log('ERROR: FAIL to load the address');
             phantom.exit(1);
         } else {
             // Set the timeout till forcing a render:
             forcedRenderTimeout = setTimeout(function () {
-                console.log("Forcing rendering to complete...")
+                console.log("WARNING: Forcing rendering to complete...")
                 doRender();
             }, maxRenderWait);
         }
     });
 
-    // Attempt to auto-scroll down:
+    // Auto-scroll down:
     autoScroller();
 
 }
