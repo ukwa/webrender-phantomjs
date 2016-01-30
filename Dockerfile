@@ -1,22 +1,25 @@
 FROM centos:7
 
-ADD yum.conf /etc/yum.conf
-
-RUN \
-  yum -y install wget bzip2 && \
-  curl -O -L -k https://bitbucket.org/ariya/phantomjs/downloads/phantomjs-1.9.8-linux-x86_64.tar.bz2 && \
-  bunzip2 phantomjs-1.9.8-linux-x86_64.tar.bz2 && tar xf phantomjs-1.9.8-linux-x86_64.tar 
-
 RUN \
   yum install -y epel-release && \
   yum install -y git python-pip python-devel libpng-devel libjpeg-devel gcc gcc-c++ make libffi-devel openssl-devel && \
-  pip install --trusted-host pypi.python.org requests[security] && \
-  pip install --trusted-host pypi.python.org Django==1.8.6 && \
-  pip install --trusted-host pypi.python.org Pillow pika gunicorn
+  pip install requests[security] Django==1.8.6 Pillow pika gunicorn
 
 RUN \
   yum -y install fontconfig libfontenc fontconfig-devel \
   libXfont ghostscript-fonts xorg-x11-font-utils urw-fonts
+
+RUN \
+  yum -y install wget bzip2 && \
+  curl -O -L -k https://bitbucket.org/ariya/phantomjs/downloads/phantomjs-2.1.1-linux-x86_64.tar.bz2 && \
+  bunzip2 phantomjs-2.1.1-linux-x86_64.tar.bz2 && tar xf phantomjs-2.1.1-linux-x86_64.tar && \
+  mv phantomjs-2.1.1-linux-x86_64 phantomjs
+
+# Building from source is also an option.
+#RUN \
+#  yum -y install git && \
+#  git clone https://github.com/ariya/phantomjs.git && \
+#  cd phantomjs && git checkout 2.1 && ./build.sh --confirm --jobs 1 
 
 COPY webrender /django-phantomjs
 
