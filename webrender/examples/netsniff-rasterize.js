@@ -338,8 +338,12 @@ if (system.args.length === 1) {
 
     page.open(page.address, function (status) {
         if (status !== 'success') {
-            console.log('ERROR: FAIL to load the address');
-            phantom.exit(1);
+            console.log('WARNING: opening the page did not succeed.');
+            // Still record what happened anyway:
+            var har = createHAR(page.address, page.title, page.startTime, page.resources, null, null, null);
+            fs.write(output, JSON.stringify(har, undefined, 4), "w");
+            // Although no page rendered, this process still ran successfully, so return 0:
+            phantom.exit(0);
         } else {
             // Set the timeout till forcing a render:
             forcedRenderTimeout = setTimeout(function () {
