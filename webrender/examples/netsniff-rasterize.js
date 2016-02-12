@@ -51,7 +51,7 @@ captureSelector = function(selector) {
     }
 }
 
-function createHAR(address, title, startTime, resources, b64_content, selectors, clickables)
+function createHAR(address, url, title, startTime, resources, b64_content, selectors, clickables)
 {
     var entries = [];
     resources.forEach(function (resource) {
@@ -130,7 +130,7 @@ function createHAR(address, title, startTime, resources, b64_content, selectors,
 
     return {
         log: {
-            version: '0.0.3',
+            version: '1.0.0',
             creator: {
                 name: "PhantomJS",
                 version: phantom.version.major + '.' + phantom.version.minor +
@@ -139,6 +139,7 @@ function createHAR(address, title, startTime, resources, b64_content, selectors,
             pages: [{
                 startedDateTime: startTime.toISOString(),
                 id: address,
+                url: url,
                 title: title,
                 pageTimings: {
                     onLoad: page.endTime - page.startTime
@@ -189,7 +190,7 @@ var doRender = function () {
         selectors = [":root"]
     }
     var b64_content = window.btoa(unescape(encodeURIComponent(page.content)));
-    var har = createHAR(page.address, page.title, page.startTime, page.resources, b64_content, selectors, clickables);
+    var har = createHAR(page.address, page.url, page.title, page.startTime, page.resources, b64_content, selectors, clickables);
     fs.write(output, JSON.stringify(har, undefined, 4), "w");
 
     phantom.exit();
@@ -340,7 +341,7 @@ if (system.args.length === 1) {
         if (status !== 'success') {
             console.log('WARNING: opening the page did not succeed.');
             // Still record what happened anyway:
-            var har = createHAR(page.address, page.title, page.startTime, page.resources, null, null, null);
+            var har = createHAR(page.address, page.url, page.title, page.startTime, page.resources, null, null, null);
             fs.write(output, JSON.stringify(har, undefined, 4), "w");
             // Although no page rendered, this process still ran successfully, so return 0:
             phantom.exit(0);
