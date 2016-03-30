@@ -83,9 +83,12 @@ def get_har_with_image(url, selectors=None):
         command += selectors
     har = Popen(command, stdout=PIPE, stderr=PIPE)
     stdout, stderr = har.communicate()
+    # If this fails completely, assume this was a temporary problem and suggest retrying the request:
     if not os.path.exists(tmp):
-        logger.info("FAILED: stdout=%s stderr=%s" %(stdout,stderr))
+        logger.error("Rendering to JSON failed for %s" % url)
+        logger.info("FAILED:\nstdout=%s\nstderr=%s" % (stdout, stderr) )
         return "FAIL"
+        #return '{ "failed": true, "retry": true }'
     with open(tmp, "r") as i:
         output = i.read()
     os.remove(tmp)
