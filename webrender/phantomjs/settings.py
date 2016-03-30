@@ -1,4 +1,4 @@
-root = "/Users/andy/Documents/workspace/django-phantomjs/phantomjs-2.0.0-macosx"
+root = "/opt/phantomjs-2.1.1-linux-x86_64"
 phantomjs = "%s/bin/phantomjs" % root
 rasterize = "./examples/rasterize.js"
 netsniff = "%s/examples/netsniff.js" % root

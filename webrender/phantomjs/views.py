@@ -84,6 +84,7 @@ def get_har_with_image(url, selectors=None):
     har = Popen(command, stdout=PIPE, stderr=PIPE)
     stdout, stderr = har.communicate()
     if not os.path.exists(tmp):
+        logger.info("FAILED: stdout=%s stderr=%s" %(stdout,stderr))
         return "FAIL"
     with open(tmp, "r") as i:
         output = i.read()
