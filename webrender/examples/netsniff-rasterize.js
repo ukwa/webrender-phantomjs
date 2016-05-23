@@ -28,11 +28,15 @@ capture = function(clipRect) {
          if (!typeof(clipRect) === "object") {
             throw new Error("clipRect must be an Object instance.");
         }
+        if( clipRect.height > 31500 ) {
+            console.log("WARNING: Very tall clip (clipRect.height = " + clipRect.height + ") resetting to 31500...");
+            clipRect.height = 31500;
+        }
     }
     try {
         page.clipRect = clipRect;
         console.log("INFO: Rendering to clipped region... "+page.clipRect.top+", "+page.clipRect.left+": "+page.clipRect.width+" x "+page.clipRect.height);
-        page.render("pjs-test.png");
+        //page.render("pjs-test.png");
         return page.renderBase64('PNG');
     } catch (e) {
         console.log("ERROR: Failed to capture screenshot: " + e, "error");
@@ -54,6 +58,7 @@ captureSelector = function(selector) {
 function createHAR(address, url, title, startTime, resources, b64_content, selectors, clickables)
 {
     var entries = [];
+    console.log("Getting request/responses...");
     resources.forEach(function (resource) {
         var request = resource.request,
             startReply = resource.startReply,
@@ -112,9 +117,11 @@ function createHAR(address, url, title, startTime, resources, b64_content, selec
     });
 
     // Reset to the full viewport:
+    console.log("Resetting viewport...");
     setToFullViewport();
 
     // Render selected elements:
+    console.log("Rendering selector(s) to PNG...");
     var renderedElements = [];
     selectors.forEach(function(selector) {
         var image = captureSelector(selector);
@@ -127,6 +134,8 @@ function createHAR(address, url, title, startTime, resources, b64_content, selec
             });
         }
     });
+
+    console.log("Returning result...");
 
     return {
         log: {
@@ -158,10 +167,12 @@ function createHAR(address, url, title, startTime, resources, b64_content, selec
 
 
 var doRender = function () {
+    console.log("doRender...");
     page.endTime = new Date();
     page.title = page.evaluate(function () {
         return document.title;
     });
+    console.log("Getting clickables...");
     var clickables = page.evaluate(function() {
         var clickables = [];
         var elements = Array.prototype.slice.call(document.getElementsByTagName("*"));
@@ -189,10 +200,14 @@ var doRender = function () {
     if( selectors.length == 0 ) {
         selectors = [":root"]
     }
+    console.log("Getting content...");
     var b64_content = window.btoa(unescape(encodeURIComponent(page.content)));
+    console.log("Creating HAR...");
     var har = createHAR(page.address, page.url, page.title, page.startTime, page.resources, b64_content, selectors, clickables);
+    console.log("Writing HAR...");
     fs.write(output, JSON.stringify(har, undefined, 4), "w");
-
+    
+    console.log("Exiting...");
     phantom.exit();
 };
 
