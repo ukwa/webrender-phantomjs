@@ -6,6 +6,7 @@ import base64
 import random
 import signal
 import logging
+from datetime import date
 from PIL import Image
 from functools import wraps
 from phantomjs.settings import *
@@ -20,12 +21,25 @@ logger = logging.getLogger("phantomjs.views")
 #logger.addHandler(handler)
 logger.setLevel(logging.DEBUG)
 
+# Add warc-prefix is json in Warcprox-Meta: header
+
+
 # --proxy=XXX.XXX:9090
 def phantomjs_cmd(proxy=None):
     cmd = [phantomjs, "--ssl-protocol=any"]
+    if not proxy and 'HTTP_PROXY' in os.environ:
+        proxy = os.environ['HTTP_PROXY']
     if proxy:
+        logger.debug("Using proxy: %s" % proxy)
         cmd = cmd + [ "--proxy=%s" % proxy ]
     return cmd
+
+def popen_with_env(clargs):
+    # Set up a copy of the environment variables, with one for the WARC prefix:
+    sub_env = dict(os.environ, WARCPROX_WARC_PREFIX=date.today().isoformat())
+    logger.debug("Using WARCPROX_WARC_PREFIX=%s" % sub_env['WARCPROX_WARC_PREFIX'])
+    # And open the process:
+    return Popen(clargs, stdout=PIPE, stderr=PIPE, env=sub_env)
 
 def generate_image(url, proxy=None):
     """Returns a 1280x960 rendering of the webpage."""
@@ -33,7 +47,7 @@ def generate_image(url, proxy=None):
     tmp = "%s/%s.png" % (temp, str(random.randint(0, 100000000)))
     cmd = phantomjs_cmd(proxy) + [rasterize, url, tmp, "1280px"]
     logger.debug("Using command: %s " % " ".join(cmd))
-    image = Popen(cmd, stdout=PIPE, stderr=PIPE)
+    image = popen_with_env(cmd)
     stdout, stderr = image.communicate()
     if stdout:
         logger.debug("phantomjs.info: %s" % stdout)
@@ -47,12 +61,6 @@ def generate_image(url, proxy=None):
     data = open(tmp, "rb").read()
     os.remove(tmp)
     return data
-
-def get_image_proxy(request, url):
-    """Tries to render an image of a URL, taken via the proxy, returning a 500 if it times out."""
-    data = generate_image(url, proxy=owb_proxy)
-    return HttpResponse(content=data, content_type="image/png")
-
 
 def get_image(request, url):
     """Tries to render an image of a URL, returning a 500 if it times out."""
@@ -70,7 +78,7 @@ def strip_debug(js):
 
 def get_har(url):
     """Gets the raw HAR output from PhantomJs."""
-    har = Popen(phantomjs_cmd() + [netsniff, url], stdout=PIPE, stderr=PIPE)
+    har = popen_with_env(phantomjs_cmd() + [netsniff, url])
     stdout, stderr = har.communicate()
     return strip_debug(stdout)
 
@@ -81,7 +89,7 @@ def get_har_with_image(url, selectors=None):
     logger.debug("Using command: %s " % " ".join(command))
     if selectors is not None:
         command += selectors
-    har = Popen(command, stdout=PIPE, stderr=PIPE)
+    har = popen_with_env(command)
     stdout, stderr = har.communicate()
     # If this fails completely, assume this was a temporary problem and suggest retrying the request:
     if not os.path.exists(tmp):
