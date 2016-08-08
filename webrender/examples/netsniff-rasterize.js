@@ -277,17 +277,21 @@ if (system.args.length === 1) {
         page.settings.userAgent = env['USER_AGENT'];
         // e.g. 'Mozilla/5.0 (Windows NT 6.1; WOW64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/37.0.2062.120 Safari/537.36';
     }
+
     // Set up an object for customHeaders:
     headers = {}
+
     // Add Memento Datetime header if needed:
+    // e.g. Accept-Datetime: Thu, 31 May 2007 20:35:00 GMT
     if( 'MEMENTO_ACCEPT_DATETIME' in env ) {
         headers['Accept-Datetime'] = env['MEMENTO_ACCEPT_DATETIME']
     }
-    // Accept-Datetime: Thu, 31 May 2007 20:35:00 GMT
-    // Add a crawl identifier if needed:
+
+    // Add a warc-prefix as JSON in a Warcprox-Meta: header
     if( 'WARCPROX_WARC_PREFIX' in env ) {
         headers['Warcprox-Meta'] = '{ "warc-prefix": "'+env['WARCPROX_WARC_PREFIX']+'" }';
     }
+    
     // And assign:
     page.customHeaders = headers;
     for(var key in page.customHeaders) {
