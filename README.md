@@ -1,21 +1,18 @@
-django-phantomjs
-================
+webrender-phantomjs
+===================
 
-A Django app. which wraps PhantomJs.
+A standalone web-rendering service that extracts links for crawlers. It also expects to be deployed behind warcprox
+and uses that to store the rendered results as WARC records.
 
-    image/<URL>     Render an PNG image of the URL in question (rasterize.js)
-    traffic/<URL>   Return JSON-formatted details of network traffic (netsniff.js)
-    urls/<URL>      As with 'traffic' but return a simple list of URLs (netsniff.js)
-    imageurls/<URL> Returns a JSON structure containing the same output as "/urls/" and a Base64-encoded 
-                    version of the output of "/image/".
-    domimage/<URL>  Returns a JSON structure based on the HAR format, containing the rendered URL both as an 
-                    image and as the onReady DOM. Any fields POSTed to this endpoint are interpreted as DOM 
-                    selectors, which can be used to generated rendered forms of particular sections 
-                    of the final page.
 
-The examples directory contains the actual PhantomJS scripts. The scripts directory contains various Python scripts for sending/receiving data.
+API
+---
 
-This application largely depends on the PhantomJS scripts that are supplied with PhantomJS itself.
+### /render?url={URL}
+
+Renders the given URL in the browser, extracts the relevant links, and passes a summary back to the caller as a JSON object.
+
+This is done using a PhantomJS script based on one provided with PhantomJS.
 
 Running the application
 -----------------------
