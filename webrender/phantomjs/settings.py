@@ -1,9 +1,0 @@
-root = "/opt/phantomjs-2.1.1-linux-x86_64"
-phantomjs = "%s/bin/phantomjs" % root
-rasterize = "./examples/rasterize.js"
-netsniff = "%s/examples/netsniff.js" % root
-domimage = "./examples/netsniff-rasterize.js"
-temp = "/var/tmp"
-timeout_limit = 30
-crop_rasterize_image = False
-owb_proxy="192.168.99.100:8090"
