@@ -55,7 +55,7 @@ captureSelector = function(selector) {
     }
 }
 
-function createHAR(address, url, title, startTime, resources, b64_content, selectors, clickables)
+function createHAR(address, url, title, startTime, resources, page_cookies, b64_content, selectors, clickables)
 {
     var entries = [];
     console.log("Getting request/responses...");
@@ -158,7 +158,8 @@ function createHAR(address, url, title, startTime, resources, b64_content, selec
                     encoding: "base64"
                 },
                 renderedElements: renderedElements,
-                map: clickables
+                map: clickables,
+                cookies: page_cookies
             }],
             entries: entries
         }
@@ -203,7 +204,8 @@ var doRender = function () {
     console.log("Getting content...");
     var b64_content = window.btoa(unescape(encodeURIComponent(page.content)));
     console.log("Creating HAR...");
-    var har = createHAR(page.address, page.url, page.title, page.startTime, page.resources, b64_content, selectors, clickables);
+    var har = createHAR(page.address, page.url, page.title, page.startTime, page.resources, page.cookies, b64_content, selectors, clickables);
+    console.log("C " + page.cookies)
     console.log("Writing HAR...");
     fs.write(output, JSON.stringify(har, undefined, 4), "w");
     
@@ -256,7 +258,7 @@ var page = require('webpage').create(),
     var fs = require("fs");
 
 if (system.args.length === 1) {
-    console.log('Usage: netsniff-rasterize.js URL output-file selectors...');
+    console.log('Usage: phantomjs-render.js URL output-file selectors...');
     phantom.exit(1);
 } else {
     page.address = system.args[1];
@@ -265,12 +267,10 @@ if (system.args.length === 1) {
     // Set up optional user agent and target datetime from the environment.
     var env = system.env;
 
-    /*
     Object.keys(env).forEach(function(key) {
       console.log(key + '=' + env[key]);
     });
     console.log("--------");
-    */
 
     // Add optional userAgent override:
     if( 'USER_AGENT' in env ) {

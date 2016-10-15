@@ -3,61 +3,57 @@ import re
 import io
 import sys
 import json
+import uuid
 import base64
 import random
 import signal
-import logging
-import urllib2
-from PIL import Image
+import logging as logger
+import urllib.request
 from functools import wraps
-from phantomjs.settings import *
+from PIL import Image
 from subprocess import Popen, PIPE
-from django.views.decorators.gzip import gzip_page
-from django.views.decorators.csrf import csrf_exempt
-from django.http import HttpResponse, HttpResponseServerError
 from datetime import date
 
-handler = logging.StreamHandler()
+root = "/phantomjs"
+phantomjs = "%s/bin/phantomjs" % root
+phantomjs = "phantomjs"
+rasterize = "/django-phantomjs/examples/rasterize.js"
+netsniff = "%s/examples/netsniff.js" % root
+domimage = "phantomjs/phantomjs-render.js"
+temp = "/var/tmp"
+timeout_limit = 30
+crop_rasterize_image = False
+owb_proxy="openwayback:8090"
 
-logger = logging.getLogger("phantomjs.views")
-#logger.addHandler(handler)
-logger.setLevel(logging.DEBUG)
-
-
-class RequestWithMethod(urllib2.Request):
-  def __init__(self, *args, **kwargs):
-    self._method = kwargs.pop('method', None)
-    urllib2.Request.__init__(self, *args, **kwargs)
-
-  def get_method(self):
-    return self._method if self._method else super(RequestWithMethod, self).get_method()
 
 def _warcprox_write_record(
-    warcprox_address, url, warc_type, content_type,
+        warcprox_address, url, warc_type, content_type,
         payload, extra_headers=None):
-    headers = {"Content-Type":content_type,"WARC-Type":warc_type,"Host":"N/A"}
+    headers = {"Content-Type": content_type, "WARC-Type": warc_type, "Host": "N/A"}
     if extra_headers:
         headers.update(extra_headers)
-    
-    request = RequestWithMethod(url, method="WARCPROX_WRITE_RECORD",
-            headers=headers, data=payload)    # XXX setting request.type="http" is a hack to stop urllib from trying
-    
+    request = urllib.request.Request(url, method="WARCPROX_WRITE_RECORD",
+                                     headers=headers, data=payload)
+
+    # XXX setting request.type="http" is a hack to stop urllib from trying
     # to tunnel if url is https
     request.type = "http"
     request.set_proxy(warcprox_address, "http")
+    logger.info("Connecting via "+warcprox_address)
 
     try:
-        response = urllib2.urlopen(request)
-        if response.getcode() != 204:
-            logger.warn(
+        with urllib.request.urlopen(request) as response:
+            if response.status != 204:
+                logger.warn(
                     'got "%s %s" response on warcprox '
                     'WARCPROX_WRITE_RECORD request (expected 204)',
-                    response.getcode(), response.info())
-    except urllib2.HTTPError as e:
+                    response.status, response.reason)
+    except urllib.error.HTTPError as e:
         logger.warn(
-                'got "%s %s" response on warcprox '
-                'WARCPROX_WRITE_RECORD request (expected 204)',
-                e.getcode(), e.info())
+            'got "%s %s" response on warcprox '
+            'WARCPROX_WRITE_RECORD request (expected 204)',
+            e.getcode(), e.info())
+
 
 # --proxy=XXX.XXX:9090
 def phantomjs_cmd(proxy=None):
@@ -97,11 +93,6 @@ def generate_image(url, proxy=None):
     os.remove(tmp)
     return data
 
-def get_image(request, url):
-    """Tries to render an image of a URL, returning a 500 if it times out."""
-    data = generate_image(url)
-    return HttpResponse(content=data, content_type="image/png")
-
 def strip_debug(js):
     """PhantomJs seems to merge its output with its error messages; this
     tries to strip them."""
@@ -117,10 +108,10 @@ def get_har(url):
     stdout, stderr = har.communicate()
     return strip_debug(stdout)
 
-def get_har_with_image(url, selectors=None):
+def get_har_with_image(url, selectors=None, warcprox="localhost:8000"):
     """Gets the raw HAR output from PhantomJs with rendered image(s)."""
-    tmp = "%s/%s.json" % (temp, str(random.randint(0, 100000000)))
-    command = phantomjs_cmd() + [domimage, url, tmp]
+    tmp = "%s/%s.json" % (temp, uuid.uuid4())
+    command = phantomjs_cmd(warcprox) + [domimage, url, tmp]
     logger.debug("Using command: %s " % " ".join(command))
     if selectors is not None:
         command += selectors
@@ -133,14 +124,10 @@ def get_har_with_image(url, selectors=None):
         return "FAIL"
         #return '{ "failed": true, "retry": true }'
     with open(tmp, "r") as i:
-        output = i.read()
+        har = i.read()
     os.remove(tmp)
-    return output
-
-def get_raw(request, url):
-    """Tries to retrieve the HAR, returning a 500 if timing out."""
-    js = get_har(url)
-    return HttpResponse(content=js, content_type="application/json")
+    har = _warcprox_write_har_content(har, warcprox)
+    return har
 
 def generate_urls(url):
     """Tries to retrieve a list of URLs from the HAR."""
@@ -148,20 +135,6 @@ def generate_urls(url):
 
     data = json.loads(js)
     return "\n".join([entry["request"]["url"] for entry in data["log"]["entries"]])
-
-def get_urls(request, url):
-    """Tries to retrieve a list of URLs, returning a 500 if timing out."""
-    response = generate_urls(url)
-    return HttpResponse(content=response, content_type="text/plain")
-
-@gzip_page
-def get_image_and_urls(request, url):
-    """Deprecated in lieu of the HAR-based 'get_dom_image'."""
-    image = base64.b64encode(generate_image(url))
-    urls = generate_urls(url)
-    data = [{'image':image, 'urls':urls}]
-    json_string = json.dumps(data)
-    return HttpResponse(content=json_string, content_type="application/json")
 
 def full_and_thumb_jpegs(large_png):
     img = Image.open(io.BytesIO(large_png))
@@ -211,17 +184,20 @@ def build_imagemap(page_jpeg, page):
     return html
 
 
-def _warcprox_write_har_content(har_js):
+def _warcprox_write_har_content(har_js, warcprox=None, include_render_in_har=False):
+    if not warcprox:
+        warcprox = os.environ['HTTP_PROXY']
+    warcprox_headers = { "Warcprox-Meta" : json.dumps( { 'warc-prefix' : 'Wrender'}) }
     har = json.loads(har_js)
     for page in har['log']['pages']:
         dom = page['renderedContent']['text']
         dom = base64.b64decode(dom)
         # Store the on-ready DOM:
-        _warcprox_write_record(warcprox_address=os.environ['HTTP_PROXY'],
+        _warcprox_write_record(warcprox_address=warcprox,
                 url="onreadydom:{}".format(page.get('url',None)),
                 warc_type="resource", content_type="text/html",
                 payload=dom,
-                extra_headers= {} )
+                extra_headers= warcprox_headers )
         # Store the rendered elements:
         full_png = None
         for rende in page['renderedElements']:
@@ -239,46 +215,40 @@ def _warcprox_write_har_content(har_js):
             if selector == ':root':
                 full_png = image
             # https://www.w3.org/TR/2003/REC-xptr-framework-20030325/
-            xpointurl = "%s#xpointer(%s)" % (page.get('url'), selector)
-            _warcprox_write_record(warcprox_address=os.environ['HTTP_PROXY'],
+            if selector == ":root":
+                xpointurl = page.get('url')
+            else:
+                xpointurl = "%s#xpointer(%s)" % (page.get('url'), selector)
+            _warcprox_write_record(warcprox_address=warcprox,
                 url="screenshot:{}".format(xpointurl),
                 warc_type="resource", content_type=im_fmt,
                 payload=image,
-                extra_headers={})
+                extra_headers=warcprox_headers)
         # If we have a full-page PNG:
         if full_png:
             # Store a thumbnail:
             (full_jpeg, thumb_jpeg) = full_and_thumb_jpegs(full_png)
-            _warcprox_write_record(warcprox_address=os.environ['HTTP_PROXY'],
+            _warcprox_write_record(warcprox_address=warcprox,
                 url="thumbnail:{}".format(page['url']),
                 warc_type="resource", content_type='image/jpeg',
-                payload=thumb_jpeg)
+                payload=thumb_jpeg, extra_headers=warcprox_headers)
             # Store an image map HTML file:
             imagemap = build_imagemap(full_jpeg, page)
-            _warcprox_write_record(warcprox_address=os.environ['HTTP_PROXY'],
+            _warcprox_write_record(warcprox_address=warcprox,
                 url="imagemap:{}".format(page['url']),
-                warc_type="resource", content_type='text/html',
-                payload=imagemap)
+                warc_type="resource", content_type='text/html; charset="utf-8"',
+                payload=bytearray(imagemap,'UTF-8'),
+                extra_headers=warcprox_headers)
+        # And remove rendered forms from HAR:
+        if not include_render_in_har:
+            page['renderedElements'] = None
+            page['renderedContent'] = None
 
+    # Store the HAR
+    _warcprox_write_record(warcprox_address=warcprox,
+                           url="har:{}".format(page.get('url', None)),
+                           warc_type="resource", content_type="application/json",
+                           payload=bytearray(json.dumps(har), "UTF-8"),
+                           extra_headers=warcprox_headers)
 
-
-@gzip_page
-@csrf_exempt
-def get_dom_image(request, url):
-    """
-    Tries to retrieve the HAR with rendered images, returning a 500 if timing out.
-    If data is POST'd it expects a string-representation of a list of selectors, e.g.:
-    "[\":root\"]"
-    """
-    if request.method == "POST" and request.body:
-        selectors = json.loads(request.body.decode("utf-8"))
-        har = get_har_with_image(url, selectors)
-    else:
-        har = get_har_with_image(url)
-    if har.startswith("FAIL"):
-        return HttpResponseServerError(content="%s" % har, content_type="text/plain")
-    else:
-        _warcprox_write_har_content(har)
-    #
-    return HttpResponse(content=har, content_type="application/json")
-
+    return har
