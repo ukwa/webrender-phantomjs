@@ -14,6 +14,8 @@ Renders the given URL in the browser, extracts the relevant links, and passes a 
 
 This is done using a PhantomJS script based on one provided with PhantomJS.
 
+e.g. an `&` needs to be encoded as %26 
+
 Running the application
 -----------------------
 

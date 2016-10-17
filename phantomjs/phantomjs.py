@@ -1,18 +1,15 @@
 import os
-import re
 import io
-import sys
 import json
 import uuid
 import base64
 import random
-import signal
 import logging as logger
 import urllib.request
-from functools import wraps
 from PIL import Image
 from subprocess import Popen, PIPE
 from datetime import date
+
 
 root = "/phantomjs"
 phantomjs = "%s/bin/phantomjs" % root
@@ -65,9 +62,9 @@ def phantomjs_cmd(proxy=None):
         cmd = cmd + [ "--proxy=%s" % proxy ]
     return cmd
 
-def popen_with_env(clargs):
+def popen_with_env(clargs, warc_prefix=None):
     # Set up a copy of the environment variables, with one for the WARC prefix:
-    sub_env = dict(os.environ, WARCPROX_WARC_PREFIX=date.today().isoformat())
+    sub_env = dict(os.environ, WARCPROX_WARC_PREFIX=warc_prefix)
     logger.debug("Using WARCPROX_WARC_PREFIX=%s" % sub_env['WARCPROX_WARC_PREFIX'])
     # And open the process:
     return Popen(clargs, stdout=PIPE, stderr=PIPE, env=sub_env)
@@ -108,14 +105,14 @@ def get_har(url):
     stdout, stderr = har.communicate()
     return strip_debug(stdout)
 
-def get_har_with_image(url, selectors=None, warcprox="localhost:8000"):
+def get_har_with_image(url, selectors=None, warcprox="localhost:8000", warc_prefix=date.today().isoformat()):
     """Gets the raw HAR output from PhantomJs with rendered image(s)."""
     tmp = "%s/%s.json" % (temp, uuid.uuid4())
     command = phantomjs_cmd(warcprox) + [domimage, url, tmp]
-    logger.debug("Using command: %s " % " ".join(command))
     if selectors is not None:
-        command += selectors
-    har = popen_with_env(command)
+        command.extend(selectors.split(" "))
+    logger.debug("Using command: %s " % " ".join(command))
+    har = popen_with_env(command, warc_prefix=warc_prefix)
     stdout, stderr = har.communicate()
     # If this fails completely, assume this was a temporary problem and suggest retrying the request:
     if not os.path.exists(tmp):
@@ -126,7 +123,7 @@ def get_har_with_image(url, selectors=None, warcprox="localhost:8000"):
     with open(tmp, "r") as i:
         har = i.read()
     os.remove(tmp)
-    har = _warcprox_write_har_content(har, warcprox)
+    har = _warcprox_write_har_content(har, warc_prefix, warcprox=warcprox)
     return har
 
 def generate_urls(url):
@@ -184,10 +181,10 @@ def build_imagemap(page_jpeg, page):
     return html
 
 
-def _warcprox_write_har_content(har_js, warcprox=None, include_render_in_har=False):
+def _warcprox_write_har_content(har_js, warc_prefix, warcprox=None, include_render_in_har=False):
     if not warcprox:
         warcprox = os.environ['HTTP_PROXY']
-    warcprox_headers = { "Warcprox-Meta" : json.dumps( { 'warc-prefix' : 'Wrender'}) }
+    warcprox_headers = { "Warcprox-Meta" : json.dumps( { 'warc-prefix' : warc_prefix}) }
     har = json.loads(har_js)
     for page in har['log']['pages']:
         dom = page['renderedContent']['text']
@@ -214,11 +211,11 @@ def _warcprox_write_har_content(har_js, warcprox=None, include_render_in_har=Fal
             # Keep the :root image
             if selector == ':root':
                 full_png = image
-            # https://www.w3.org/TR/2003/REC-xptr-framework-20030325/
-            if selector == ":root":
                 xpointurl = page.get('url')
             else:
+                # https://www.w3.org/TR/2003/REC-xptr-framework-20030325/
                 xpointurl = "%s#xpointer(%s)" % (page.get('url'), selector)
+            # And write the WARC:
             _warcprox_write_record(warcprox_address=warcprox,
                 url="screenshot:{}".format(xpointurl),
                 warc_type="resource", content_type=im_fmt,
