@@ -17,6 +17,8 @@ PHANTOMJS_BINARY = os.getenv('PHANTOMJS_BINARY', "phantomjs")
 # Location of the PhantomJS script we need:
 PHANTOMJS_RENDER_SCRIPT = os.getenv('PHANTOMJS_RENDER_SCRIPT', "phantomjs/phantomjs-render.js")
 
+# Location of WARCPROX proxy used to store WARC records:
+WARCPROX = os.getenv("HTTP_PROXY", None)
 
 # --proxy=XXX.XXX:9090
 def phantomjs_cmd(proxy=None):
@@ -46,10 +48,10 @@ def strip_debug(js):
 
 def get_har_with_image(url, selectors=None, warcprox="localhost:8000", warc_prefix=date.today().isoformat(), include_rendered=False):
     """Gets the raw HAR output from PhantomJs with rendered image(s)."""
-    tmp = tempfile.mkstemp()
+    (fd, tmp) = tempfile.mkstemp()
     command = phantomjs_cmd(warcprox) + [PHANTOMJS_RENDER_SCRIPT, url, tmp]
-    if selectors is not None:
-        command.extend(selectors.split(" "))
+    if selectors:
+        command = command + selectors.split(" ")
     logger.debug("Using command: %s " % " ".join(command))
     har = popen_with_env(command, warc_prefix=warc_prefix)
     stdout, stderr = har.communicate()
@@ -113,9 +115,7 @@ def build_imagemap(page_jpeg, page):
     return html
 
 
-def _warcprox_write_har_content(har_js, url, warc_prefix, warcprox=None, include_rendered_in_har=False):
-    if not warcprox:
-        warcprox = os.environ['HTTP_PROXY']
+def _warcprox_write_har_content(har_js, url, warc_prefix, warcprox=WARCPROX, include_rendered_in_har=False):
     warcprox_headers = { "Warcprox-Meta" : json.dumps( { 'warc-prefix' : warc_prefix}) }
     har = json.loads(har_js)
     for page in har['log']['pages']:
