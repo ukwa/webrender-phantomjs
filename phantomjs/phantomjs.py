@@ -1,60 +1,26 @@
 import os
 import io
 import json
-import uuid
 import base64
-import random
+import tempfile
 import logging as logger
 import urllib.request
+import urllib.error
 from PIL import Image
 from subprocess import Popen, PIPE
 from datetime import date
 
 
-root = "/phantomjs"
-phantomjs = "%s/bin/phantomjs" % root
-phantomjs = "phantomjs"
-rasterize = "/django-phantomjs/examples/rasterize.js"
-netsniff = "%s/examples/netsniff.js" % root
-domimage = "phantomjs/phantomjs-render.js"
-temp = "/var/tmp"
-timeout_limit = 30
-crop_rasterize_image = False
-owb_proxy="openwayback:8090"
+# Location of the PhantomJS binary:
+PHANTOMJS_BINARY = os.getenv('PHANTOMJS_BINARY', "phantomjs")
 
-
-def _warcprox_write_record(
-        warcprox_address, url, warc_type, content_type,
-        payload, extra_headers=None):
-    headers = {"Content-Type": content_type, "WARC-Type": warc_type, "Host": "N/A"}
-    if extra_headers:
-        headers.update(extra_headers)
-    request = urllib.request.Request(url, method="WARCPROX_WRITE_RECORD",
-                                     headers=headers, data=payload)
-
-    # XXX setting request.type="http" is a hack to stop urllib from trying
-    # to tunnel if url is https
-    request.type = "http"
-    request.set_proxy(warcprox_address, "http")
-    logger.info("Connecting via "+warcprox_address)
-
-    try:
-        with urllib.request.urlopen(request) as response:
-            if response.status != 204:
-                logger.warn(
-                    'got "%s %s" response on warcprox '
-                    'WARCPROX_WRITE_RECORD request (expected 204)',
-                    response.status, response.reason)
-    except urllib.error.HTTPError as e:
-        logger.warn(
-            'got "%s %s" response on warcprox '
-            'WARCPROX_WRITE_RECORD request (expected 204)',
-            e.getcode(), e.info())
+# Location of the PhantomJS script we need:
+PHANTOMJS_RENDER_SCRIPT = os.getenv('PHANTOMJS_RENDER_SCRIPT', "phantomjs/phantomjs-render.js")
 
 
 # --proxy=XXX.XXX:9090
 def phantomjs_cmd(proxy=None):
-    cmd = [phantomjs, "--ssl-protocol=any"]
+    cmd = [PHANTOMJS_BINARY, "--ssl-protocol=any"]
     if not proxy and 'HTTP_PROXY' in os.environ:
         proxy = os.environ['HTTP_PROXY']
     if proxy:
@@ -69,27 +35,6 @@ def popen_with_env(clargs, warc_prefix=None):
     # And open the process:
     return Popen(clargs, stdout=PIPE, stderr=PIPE, env=sub_env)
 
-def generate_image(url, proxy=None):
-    """Returns a 1280x960 rendering of the webpage."""
-    logger.debug("Rendering: %s..." %url)
-    tmp = "%s/%s.png" % (temp, str(random.randint(0, 100000000)))
-    cmd = phantomjs_cmd(proxy) + [rasterize, url, tmp, "1280px"]
-    logger.debug("Using command: %s " % " ".join(cmd))
-    image = popen_with_env(cmd)
-    stdout, stderr = image.communicate()
-    if stdout:
-        logger.debug("phantomjs.info: %s" % stdout)
-    if stderr:
-        logger.debug("phantomjs.error: %s" % stderr)
-    if crop_rasterize_image:
-        im = Image.open(tmp)
-        crop = im.crop((0, 0, 1280, 1024))
-        crop.save(tmp, format='PNG')
-        logger.debug("Cropped.")
-    data = open(tmp, "rb").read()
-    os.remove(tmp)
-    return data
-
 def strip_debug(js):
     """PhantomJs seems to merge its output with its error messages; this
     tries to strip them."""
@@ -99,16 +44,10 @@ def strip_debug(js):
             return "\n".join(lines[index:])
     return js
 
-def get_har(url):
-    """Gets the raw HAR output from PhantomJs."""
-    har = popen_with_env(phantomjs_cmd() + [netsniff, url])
-    stdout, stderr = har.communicate()
-    return strip_debug(stdout)
-
-def get_har_with_image(url, selectors=None, warcprox="localhost:8000", warc_prefix=date.today().isoformat()):
+def get_har_with_image(url, selectors=None, warcprox="localhost:8000", warc_prefix=date.today().isoformat(), include_rendered=False):
     """Gets the raw HAR output from PhantomJs with rendered image(s)."""
-    tmp = "%s/%s.json" % (temp, uuid.uuid4())
-    command = phantomjs_cmd(warcprox) + [domimage, url, tmp]
+    tmp = tempfile.mkstemp()
+    command = phantomjs_cmd(warcprox) + [PHANTOMJS_RENDER_SCRIPT, url, tmp]
     if selectors is not None:
         command.extend(selectors.split(" "))
     logger.debug("Using command: %s " % " ".join(command))
@@ -123,15 +62,8 @@ def get_har_with_image(url, selectors=None, warcprox="localhost:8000", warc_pref
     with open(tmp, "r") as i:
         har = i.read()
     os.remove(tmp)
-    har = _warcprox_write_har_content(har, warc_prefix, warcprox=warcprox)
+    har = _warcprox_write_har_content(har, url, warc_prefix, warcprox=warcprox, include_rendered_in_har=include_rendered)
     return har
-
-def generate_urls(url):
-    """Tries to retrieve a list of URLs from the HAR."""
-    js = get_har(url)
-
-    data = json.loads(js)
-    return "\n".join([entry["request"]["url"] for entry in data["log"]["entries"]])
 
 def full_and_thumb_jpegs(large_png):
     img = Image.open(io.BytesIO(large_png))
@@ -181,7 +113,7 @@ def build_imagemap(page_jpeg, page):
     return html
 
 
-def _warcprox_write_har_content(har_js, warc_prefix, warcprox=None, include_render_in_har=False):
+def _warcprox_write_har_content(har_js, url, warc_prefix, warcprox=None, include_rendered_in_har=False):
     if not warcprox:
         warcprox = os.environ['HTTP_PROXY']
     warcprox_headers = { "Warcprox-Meta" : json.dumps( { 'warc-prefix' : warc_prefix}) }
@@ -237,15 +169,45 @@ def _warcprox_write_har_content(har_js, warc_prefix, warcprox=None, include_rend
                 payload=bytearray(imagemap,'UTF-8'),
                 extra_headers=warcprox_headers)
         # And remove rendered forms from HAR:
-        if not include_render_in_har:
-            page['renderedElements'] = None
-            page['renderedContent'] = None
+        if not include_rendered_in_har:
+            del page['renderedElements']
+            del page['renderedContent']
 
     # Store the HAR
     _warcprox_write_record(warcprox_address=warcprox,
-                           url="har:{}".format(page.get('url', None)),
+                           url="har:{}".format(url),
                            warc_type="resource", content_type="application/json",
                            payload=bytearray(json.dumps(har), "UTF-8"),
                            extra_headers=warcprox_headers)
 
     return har
+
+
+def _warcprox_write_record(
+        warcprox_address, url, warc_type, content_type,
+        payload, extra_headers=None):
+    headers = {"Content-Type": content_type, "WARC-Type": warc_type, "Host": "N/A"}
+    if extra_headers:
+        headers.update(extra_headers)
+    request = urllib.request.Request(url, method="WARCPROX_WRITE_RECORD",
+                                     headers=headers, data=payload)
+
+    # XXX setting request.type="http" is a hack to stop urllib from trying
+    # to tunnel if url is https
+    request.type = "http"
+    request.set_proxy(warcprox_address, "http")
+    logger.info("Connecting via "+warcprox_address)
+
+    try:
+        with urllib.request.urlopen(request) as response:
+            if response.status != 204:
+                logger.warning(
+                    'got "%s %s" response on warcprox '
+                    'WARCPROX_WRITE_RECORD request (expected 204)',
+                    response.status, response.reason)
+    except urllib.error.HTTPError as e:
+        logger.warning(
+            'got "%s %s" response on warcprox '
+            'WARCPROX_WRITE_RECORD request (expected 204)',
+            e.getcode(), e.info())
+
