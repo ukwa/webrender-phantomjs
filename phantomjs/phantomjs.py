@@ -18,7 +18,7 @@ PHANTOMJS_BINARY = os.getenv('PHANTOMJS_BINARY', "phantomjs")
 PHANTOMJS_RENDER_SCRIPT = os.getenv('PHANTOMJS_RENDER_SCRIPT', "phantomjs/phantomjs-render.js")
 
 # Location of WARCPROX proxy used to store WARC records:
-WARCPROX = os.getenv("HTTP_PROXY", None)
+WARCPROX = os.getenv("WARCPROX", None)
 
 # --proxy=XXX.XXX:9090
 def phantomjs_cmd(proxy=None):
@@ -46,7 +46,7 @@ def strip_debug(js):
             return "\n".join(lines[index:])
     return js
 
-def get_har_with_image(url, selectors=None, warcprox="localhost:8000", warc_prefix=date.today().isoformat(), include_rendered=False):
+def get_har_with_image(url, selectors=None, warcprox=WARCPROX, warc_prefix=date.today().isoformat(), include_rendered=False):
     """Gets the raw HAR output from PhantomJs with rendered image(s)."""
     (fd, tmp) = tempfile.mkstemp()
     command = phantomjs_cmd(warcprox) + [PHANTOMJS_RENDER_SCRIPT, url, tmp]
