@@ -18,6 +18,14 @@ def welcome():
     return 'Wrender'
 
 
+@app.route('/ping')
+def ping():
+    """
+    :return: a simple message to verify the system is running.
+    """
+    return 'pong'
+
+
 @app.route('/render')
 def render():
     """
