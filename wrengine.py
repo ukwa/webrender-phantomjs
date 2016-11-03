@@ -1,6 +1,6 @@
 from phantomjs import phantomjs
 import logging
-import json
+import io
 import flask
 
 # Flash application context
@@ -37,4 +37,13 @@ def render():
     include_rendered = flask.request.args.get('include_rendered', False)
     app.logger.debug("Got include_rendered: %s" % include_rendered)
     #
-    return flask.jsonify(phantomjs.get_har_with_image(url, selectors, warc_prefix=warc_prefix, include_rendered=include_rendered))
+    show_screenshot = flask.request.args.get('show_screenshot', False)
+    app.logger.debug("Got show_screenshot: %s" % show_screenshot)
+    #
+    if show_screenshot:
+        return flask.send_file(io.BytesIO(
+            phantomjs.get_har_with_image(url, selectors, warc_prefix=warc_prefix,
+                  include_rendered=include_rendered, return_screenshot=True)), mimetype='image/png')
+    else:
+        return flask.jsonify(phantomjs.get_har_with_image(url, selectors, warc_prefix=warc_prefix,
+                                                          include_rendered=include_rendered))

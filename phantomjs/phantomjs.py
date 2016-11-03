@@ -46,7 +46,8 @@ def strip_debug(js):
             return "\n".join(lines[index:])
     return js
 
-def get_har_with_image(url, selectors=None, warcprox=WARCPROX, warc_prefix=date.today().isoformat(), include_rendered=False):
+def get_har_with_image(url, selectors=None, warcprox=WARCPROX, warc_prefix=date.today().isoformat(),
+                       include_rendered=False, return_screenshot=False):
     """Gets the raw HAR output from PhantomJs with rendered image(s)."""
     (fd, tmp) = tempfile.mkstemp()
     command = phantomjs_cmd(warcprox) + [PHANTOMJS_RENDER_SCRIPT, url, tmp]
@@ -61,11 +62,14 @@ def get_har_with_image(url, selectors=None, warcprox=WARCPROX, warc_prefix=date.
         logger.info("FAILED:\nstdout=%s\nstderr=%s" % (stdout, stderr) )
         return "FAIL"
         #return '{ "failed": true, "retry": true }'
+    else:
+        logger.info("GOT:\nstdout=%s\nstderr=%s" % (stdout, stderr))
     with open(tmp, "r") as i:
         har = i.read()
     os.remove(tmp)
-    har = _warcprox_write_har_content(har, url, warc_prefix, warcprox=warcprox, include_rendered_in_har=include_rendered)
-    return har
+    output = _warcprox_write_har_content(har, url, warc_prefix, warcprox=warcprox,
+                                         include_rendered_in_har=include_rendered, return_screenshot=return_screenshot)
+    return output
 
 def full_and_thumb_jpegs(large_png):
     img = Image.open(io.BytesIO(large_png))
@@ -105,19 +109,27 @@ def build_imagemap(page_jpeg, page):
     html = html + '<img src="data:image/jpeg;base64,%s" usemap="#shapes" alt="%s">\n' %( base64.b64encode(page_jpeg), page['title'])
     html = html + '<map name="shapes">\n'
     for box in page['map']:
-        x1 = box['location']['left']
-        y1 = box['location']['top']
-        x2 = x1 + box['location']['width']
-        y2 = y1 + box['location']['height']
-        html = html + '<area shape=rect coords="%i,%i,%i,%i" href="%s">\n' % (x1,y1,x2,y2,box['href'])
+        if 'href' in box:
+            x1 = box['location']['left']
+            y1 = box['location']['top']
+            x2 = x1 + box['location']['width']
+            y2 = y1 + box['location']['height']
+            html = html + '<area shape=rect coords="%i,%i,%i,%i" href="%s">\n' % (x1,y1,x2,y2,box['href'])
+        else:
+            logger.info("Skipping box with no 'href': %s" % box)
     html = html + '</map>\n'
     html = html + "</body>\n</html>\n"
     return html
 
 
-def _warcprox_write_har_content(har_js, url, warc_prefix, warcprox=WARCPROX, include_rendered_in_har=False):
+def _warcprox_write_har_content(har_js, url, warc_prefix, warcprox=WARCPROX, include_rendered_in_har=False,
+                                return_screenshot=False):
     warcprox_headers = { "Warcprox-Meta" : json.dumps( { 'warc-prefix' : warc_prefix}) }
     har = json.loads(har_js)
+    # If there are no entries, something went very wrong:
+    if len(har['log']['entries']) == 0:
+        raise Exception("No requests/responses logged! Rendering failed!")
+    # Look at page contents:
     for page in har['log']['pages']:
         dom = page['renderedContent']['text']
         dom = base64.b64decode(dom)
@@ -168,6 +180,9 @@ def _warcprox_write_har_content(har_js, url, warc_prefix, warcprox=WARCPROX, inc
                 warc_type="resource", content_type='text/html; charset="utf-8"',
                 payload=bytearray(imagemap,'UTF-8'),
                 extra_headers=warcprox_headers)
+            if return_screenshot:
+                return full_png
+
         # And remove rendered forms from HAR:
         if not include_rendered_in_har:
             del page['renderedElements']
