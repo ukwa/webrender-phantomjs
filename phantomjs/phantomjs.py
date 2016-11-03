@@ -22,7 +22,7 @@ WARCPROX = os.getenv("WARCPROX", None)
 
 # --proxy=XXX.XXX:9090
 def phantomjs_cmd(proxy=None):
-    cmd = [PHANTOMJS_BINARY, "--ssl-protocol=any"]
+    cmd = [PHANTOMJS_BINARY, "--ssl-protocol=any", "--ignore-ssl-errors=true", "--web-security=false"]
     if not proxy and 'HTTP_PROXY' in os.environ:
         proxy = os.environ['HTTP_PROXY']
     if proxy:
@@ -210,8 +210,12 @@ def _warcprox_write_record(
     # XXX setting request.type="http" is a hack to stop urllib from trying
     # to tunnel if url is https
     request.type = "http"
-    request.set_proxy(warcprox_address, "http")
-    logger.info("Connecting via "+warcprox_address)
+    if warcprox_address:
+        request.set_proxy(warcprox_address, "http")
+        logger.info("Connecting via "+warcprox_address)
+    else:
+        logger.error("Cannot write WARC records without warcprox!")
+        return
 
     try:
         with urllib.request.urlopen(request) as response:
