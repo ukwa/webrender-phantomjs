@@ -32,7 +32,8 @@ def phantomjs_cmd(proxy=None):
 
 def popen_with_env(clargs, warc_prefix=None):
     # Set up a copy of the environment variables, with one for the WARC prefix:
-    sub_env = dict(os.environ, WARCPROX_WARC_PREFIX=warc_prefix)
+    sub_env = dict(os.environ, WARCPROX_WARC_PREFIX=warc_prefix,
+                   USER_AGENT_ADDITIONAL="bl.uk_lddc_renderbot/2.0.0 (+ http://www.bl.uk/aboutus/legaldeposit/websites/websites/faqswebmaster/index.html)")
     logger.debug("Using WARCPROX_WARC_PREFIX=%s" % sub_env['WARCPROX_WARC_PREFIX'])
     # And open the process:
     return Popen(clargs, stdout=PIPE, stderr=PIPE, env=sub_env)
