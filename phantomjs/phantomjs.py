@@ -106,7 +106,7 @@ def full_and_thumb_jpegs(large_png):
 # </map>
 # <img alt="Embedded Image" src="data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAADIA..." />
 def build_imagemap(page_jpeg, page):
-    html = "<html><head><title>%s - Static version of %s</title>\n</head>\n<body>\n" % (page['title'], page['url'])
+    html = "<html><head><title>%s [Static version of %s]</title>\n</head>\n<body style=\"margin: 0;\">\n" % (page['title'], page['url'])
     html = html + '<img src="data:image/jpeg;base64,%s" usemap="#shapes" alt="%s">\n' %( base64.b64encode(page_jpeg).decode('utf-8'), page['title'])
     html = html + '<map name="shapes">\n'
     for box in page['map']:
