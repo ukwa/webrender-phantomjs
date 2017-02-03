@@ -13,7 +13,7 @@ RUN \
 RUN \
   curl -O https://bootstrap.pypa.io/get-pip.py && \
   python3 get-pip.py && \
-  pip install requests[security] Pillow gunicorn flask
+  pip install requests[security] Pillow gunicorn flask gevent
 
 RUN \
   yum -y install wget bzip2 && \
