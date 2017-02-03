@@ -60,11 +60,11 @@ def get_har_with_image(url, selectors=None, warcprox=WARCPROX, warc_prefix=date.
     # If this fails completely, assume this was a temporary problem and suggest retrying the request:
     if not os.path.exists(tmp):
         logger.error("Rendering to JSON failed for %s" % url)
-        logger.info("FAILED:\nstdout=%s\nstderr=%s" % (stdout, stderr) )
+        logger.warning("FAILED:\nstdout=%s\nstderr=%s" % (stdout, stderr) )
         return "FAIL"
         #return '{ "failed": true, "retry": true }'
     else:
-        logger.info("GOT:\nstdout=%s\nstderr=%s" % (stdout, stderr))
+        logger.debug("GOT:\nstdout=%s\nstderr=%s" % (stdout, stderr))
     with open(tmp, "r") as i:
         har = i.read()
     os.remove(tmp)
@@ -79,12 +79,12 @@ def full_and_thumb_jpegs(large_png):
     full_jpeg = out.getvalue()
 
     w, h = img.size
-    logger.info("Types are %s, %s" % ( type(w), type(h) ))
+    logger.debug("Types are %s, %s" % ( type(w), type(h) ))
     h = int(h)
-    logger.info("IMAGE %i x %x" % (w,h))
+    logger.debug("IMAGE %i x %x" % (w,h))
     thumb_width = 300
     thumb_height = int((float(thumb_width) / w) * h)
-    logger.info("Got %i x %x" % (thumb_width,thumb_height))
+    logger.debug("Got %i x %x" % (thumb_width,thumb_height))
     img.thumbnail((thumb_width, thumb_height))
     
     out = io.BytesIO()
@@ -117,7 +117,7 @@ def build_imagemap(page_jpeg, page):
             y2 = y1 + box['location']['height']
             html = html + '<area shape=rect coords="%i,%i,%i,%i" href="%s">\n' % (x1,y1,x2,y2,box['href'])
         else:
-            logger.info("Skipping box with no 'href': %s" % box)
+            logger.debug("Skipping box with no 'href': %s" % box)
     html = html + '</map>\n'
     html = html + "</body>\n</html>\n"
     return html
@@ -213,7 +213,7 @@ def _warcprox_write_record(
     request.type = "http"
     if warcprox_address:
         request.set_proxy(warcprox_address, "http")
-        logger.info("Connecting via "+warcprox_address)
+        logger.debug("Connecting via "+warcprox_address)
     else:
         logger.error("Cannot write WARC records without warcprox!")
         return

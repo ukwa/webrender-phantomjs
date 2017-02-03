@@ -7,8 +7,7 @@ import flask
 app = flask.Flask(__name__)
 
 # Setup logging
-logging.getLogger().setLevel(logging.DEBUG)
-
+logging.getLogger().setLevel(logging.INFO)
 
 @app.route('/')
 def welcome():
@@ -34,7 +33,7 @@ def render():
     "[\":root\"]"
     """
     url = flask.request.args.get('url')
-    app.logger.debug("Got URL: %s" % url)
+    app.logger.info("Got URL: %s" % url)
     #
     selectors = flask.request.args.get('selectors', ':root')
     app.logger.debug("Got selectors: %s" % selectors)
