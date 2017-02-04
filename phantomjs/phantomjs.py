@@ -129,6 +129,7 @@ def _warcprox_write_har_content(har_js, url, warc_prefix, warcprox=WARCPROX, inc
     har = json.loads(har_js)
     # If there are no entries, something went very wrong:
     if len(har['log']['entries']) == 0:
+        logger.error("No entries in log: " + har_js)
         raise Exception("No requests/responses logged! Rendering failed!")
     # Look at page contents:
     for page in har['log']['pages']:
