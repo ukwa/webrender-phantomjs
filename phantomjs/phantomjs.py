@@ -79,7 +79,10 @@ def get_har_with_image(url, selectors=None, warcprox=WARCPROX, warc_prefix=date.
     return output
 
 def full_and_thumb_jpegs(large_png):
+    # Load the image and drop the alpha channel:
     img = Image.open(io.BytesIO(large_png))
+    img = img.convert("RGB")
+    # Save it as a JPEG:
     out = io.BytesIO()
     img.save(out, "jpeg", quality=95)
     full_jpeg = out.getvalue()
