@@ -134,7 +134,7 @@ function createHAR(address, url, title, startTime, resources, page_cookies, b64_
             });
         }
     });
-
+    
     console.log("Returning result...");
 
     return {
@@ -347,7 +347,11 @@ if (system.args.length === 1) {
         trace.forEach(function(item) {
             console.log("ERROR:", item.file, ':', item.line);
         })
-    };    
+    };
+
+    page.onResourceError = function(resourceError) {
+        console.error(resourceError.url + ': ' + resourceError.errorString);
+    };
 
     page.onConsoleError = function (msg, trace) {
         console.log("ERROR:",msg);
@@ -362,14 +366,35 @@ if (system.args.length === 1) {
         if (status !== 'success') {
             console.log('WARNING: opening the page did not succeed.');
             // Still record what happened anyway:
-            var har = createHAR(page.address, page.url, page.title, page.startTime, page.resources, null, null, null);
-            fs.write(output, JSON.stringify(har, undefined, 4), "w");
-            // Although no page rendered, this process still ran successfully, so return 0:
-            phantom.exit(0);
+            // Wait a bit first, to avoid the system hanging:
+            setTimeout(function () {
+                // Force an exit in case the HAR building hangs:
+                setTimeout(function () {
+                    console.log("Forcing exit after error opening page...");
+                    phantom.exit(0);
+                }, maxRenderWait);
+
+                // Now attempt to build the HAR:
+                var output = system.args[2];
+                selectors = [":root"]
+                if( output ) {
+                    var har = createHAR(page.address, page.url, page.title, page.startTime, page.resources, null, null, selectors, null);
+                    fs.write(output, JSON.stringify(har, undefined, 4), "w");
+                }
+                // Although no page rendered, this process still ran successfully, so return 0:
+                console.log("Exiting cleanly...");
+                phantom.exit(0);
+            }, maxRenderWait);
         } else {
             // Set the timeout till forcing a render:
             forcedRenderTimeout = setTimeout(function () {
-                console.log("WARNING: Forcing rendering to complete...")
+                // Force an exit in case the load fails:
+                setTimeout(function () {
+                    console.log("Forcing exit after awaiting render...");
+                    phantom.exit(0);
+                }, maxRenderWait);
+                // Now force the render:
+                console.log("WARNING: Forcing rendering to complete...");
                 doRender();
             }, maxRenderWait);
         }
