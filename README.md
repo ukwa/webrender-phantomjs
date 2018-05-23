@@ -21,18 +21,14 @@ Additional query parameters: `warc-prefix`, `selectors` and `include-rendered`
 Running the application
 -----------------------
 
-The application runs out of the webrender folder:
+For development purposes, install [Flask](http://flask.pocoo.org/) and run
 
-    $ cd webrender
+    $ FLASK_APP=wrengine.py flask run
 
-For development purposes, run
+and go to http://127.0.0.1:5000/
 
-    $ python manage.py runserver
+For production deployment, an example [gunicorn](http://docs.gunicorn.org/en/latest/install.html) configuration is included:
 
-and go to http://127.0.0.1:8000/webtools
-
-For [production deployment](https://docs.djangoproject.com/en/1.8/howto/deployment/), an example [gunicorn](http://docs.gunicorn.org/en/latest/install.html) configuration is included:
-
-    $ gunicorn -c gunicorn.ini wsgi:application
+    $ gunicorn -c gunicorn.ini wrengine:app
 
 
