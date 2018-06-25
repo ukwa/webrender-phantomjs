@@ -70,9 +70,10 @@ function createHAR(address, url, title, startTime, resources, page_cookies, b64_
 
         // Exclude Data URI from HAR file because
         // they aren't included in specification
+        // but moreover are of little use
         if (request.url.match(/(^data:image\/.*)/i)) {
-            //Include these; we're already breaking the spec.
-            //return;
+            console.log("Ignoring data:image URL "+ request.url)
+            return;
         }
 
         entries.push({
