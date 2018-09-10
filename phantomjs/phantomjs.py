@@ -151,6 +151,7 @@ def build_imagemap(page_jpeg, page):
     return html
 
 
+# We use the page ID (i.e. the original URL) to identify records, but note that the final URL can be different.
 def _warcprox_write_har_content(har_js, url, warc_prefix, warcprox=WARCPROX, include_rendered_in_har=False,
                                 return_screenshot=False):
     warcprox_headers = { "Warcprox-Meta" : json.dumps( { 'warc-prefix' : warc_prefix}) }
@@ -163,11 +164,15 @@ def _warcprox_write_har_content(har_js, url, warc_prefix, warcprox=WARCPROX, inc
     for page in har['log']['pages']:
         dom = page['renderedContent']['text']
         dom = base64.b64decode(dom)
+
+        # Store the page URL, which can be different (redirects etc.)
+        location = page.get('url', None)
+
         # Store the on-ready DOM:
         _warcprox_write_record(warcprox_address=warcprox,
-                url="onreadydom:{}".format(page.get('url',None)),
+                url="onreadydom:{}".format(page.get('id',None)),
                 warc_type="resource", content_type="text/html",
-                payload=dom,
+                payload=dom, location=location,
                 extra_headers= warcprox_headers )
         # Store the rendered elements:
         full_png = None
@@ -185,30 +190,30 @@ def _warcprox_write_har_content(har_js, url, warc_prefix, warcprox=WARCPROX, inc
             # Keep the :root image
             if selector == ':root':
                 full_png = image
-                xpointurl = page.get('url')
+                xpointurl = page.get('id')
             else:
                 # https://www.w3.org/TR/2003/REC-xptr-framework-20030325/
-                xpointurl = "%s#xpointer(%s)" % (page.get('url'), selector)
+                xpointurl = "%s#xpointer(%s)" % (page.get('id'), selector)
             # And write the WARC:
             _warcprox_write_record(warcprox_address=warcprox,
                 url="screenshot:{}".format(xpointurl),
                 warc_type="resource", content_type=im_fmt,
-                payload=image,
+                payload=image, location=location,
                 extra_headers=warcprox_headers)
         # If we have a full-page PNG:
         if full_png:
             # Store a thumbnail:
             (full_jpeg, thumb_jpeg) = full_and_thumb_jpegs(full_png)
             _warcprox_write_record(warcprox_address=warcprox,
-                url="thumbnail:{}".format(page['url']),
+                url="thumbnail:{}".format(page['id']),
                 warc_type="resource", content_type='image/jpeg',
-                payload=thumb_jpeg, extra_headers=warcprox_headers)
+                payload=thumb_jpeg, location=location, extra_headers=warcprox_headers)
             # Store an image map HTML file:
             imagemap = build_imagemap(full_jpeg, page)
             _warcprox_write_record(warcprox_address=warcprox,
-                url="imagemap:{}".format(page['url']),
+                url="imagemap:{}".format(page['id']),
                 warc_type="resource", content_type='text/html; charset="utf-8"',
-                payload=bytearray(imagemap,'UTF-8'),
+                payload=bytearray(imagemap,'UTF-8'), location=location,
                 extra_headers=warcprox_headers)
             if return_screenshot:
                 return full_png
@@ -230,8 +235,10 @@ def _warcprox_write_har_content(har_js, url, warc_prefix, warcprox=WARCPROX, inc
 
 def _warcprox_write_record(
         warcprox_address, url, warc_type, content_type,
-        payload, extra_headers=None):
+        payload, location=None, extra_headers=None):
     headers = {"Content-Type": content_type, "WARC-Type": warc_type, "Host": "N/A"}
+    if location:
+        headers['Location'] = location
     if extra_headers:
         headers.update(extra_headers)
     request = urllib.request.Request(url, method="WARCPROX_WRITE_RECORD",
