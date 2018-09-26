@@ -28,6 +28,11 @@ capture = function(clipRect) {
          if (!typeof(clipRect) === "object") {
             throw new Error("clipRect must be an Object instance.");
         }
+        if( clipRect.height < 50 ) {
+            console.log("WARNING: Very small (clipRect.height = " + clipRect.height + ") using page.viewportSize.height...");
+            clipRect.height = page.viewportSize.height;
+        }
+        // Many tools struggle with PNG images taller than 31500 pixels:
         if( clipRect.height > 31500 ) {
             console.log("WARNING: Very tall clip (clipRect.height = " + clipRect.height + ") resetting to 31500...");
             clipRect.height = 31500;
