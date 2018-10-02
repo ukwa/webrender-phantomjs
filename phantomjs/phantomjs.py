@@ -56,12 +56,13 @@ def get_har_with_image(url, selectors=None, warcprox=WARCPROX, warc_prefix=date.
         command = command + selectors.split(" ")
     logger.debug("Using command: %s " % " ".join(command))
     har = popen_with_env(command, warc_prefix=warc_prefix)
-    stdout, stderr = har.communicate(timeout=60*10) # Kill renders that take far too long (10 mins)
+    stdout, stderr = har.communicate(timeout=60*5) # Kill renders that take far too long (5 mins)
     # kill the process if it's still open/timed-out
     try:
         har.kill()
     except OSError:
         # can't kill a dead proc
+        logger.exception("Failed to kill render process!")
         pass
     # If this fails completely, assume this was a temporary problem and suggest retrying the request:
     if not os.path.exists(tmp):
