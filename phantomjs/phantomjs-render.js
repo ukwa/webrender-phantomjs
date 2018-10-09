@@ -258,7 +258,8 @@ var page = require('webpage').create(),
     system = require('system'),
     count = 0,
     resourceWait  = 2000, 
-    maxRenderWait = 30000,
+    renderWait = 5*60*1000,
+    gracePeriod = 1*60*1000,
     forcedRenderTimeout,
     renderTimeout;
     var fs = require("fs");
@@ -373,19 +374,18 @@ if (system.args.length === 1) {
 
         // Set the timeout till forcing a render:
         forcedRenderTimeout = setTimeout(function () {
-
-            // Force an exit in case the load fails:
-            setTimeout(function () {
-                console.log("Forcing exit after awaiting render...");
-                phantom.exit(0);
-            }, maxRenderWait);
-
             // Now force the render:
             console.log("WARNING: Forcing rendering to complete...");
             doRender();
 
-        }, maxRenderWait);
+        }, renderWait);
     });
+
+    // Force an exit in case the load fails:
+    setTimeout(function () {
+        console.log("Forcing exit after awaiting render...");
+        phantom.exit(0);
+    }, renderWait + gracePeriod);
 
     // Auto-scroll down:
     autoScroller();
