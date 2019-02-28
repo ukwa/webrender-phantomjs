@@ -23,12 +23,6 @@ RUN \
 
 ENV PHANTOMJS_BINARY /opt/phantomjs/bin/phantomjs
 
-# Building from source is also an option.
-#RUN \
-#  yum -y install git && \
-#  git clone https://github.com/ariya/phantomjs.git && \
-#  cd phantomjs && git checkout 2.1 && ./build.sh --confirm --jobs 1 
-
 COPY . /webrender
 
 WORKDIR webrender
