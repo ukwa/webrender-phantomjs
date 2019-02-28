@@ -1,4 +1,4 @@
-from phantomjs import phantomjs
+from webrender.puppeteer.docker import get_har_with_image
 import logging
 import io
 import flask
@@ -49,8 +49,8 @@ def render():
     #
     if show_screenshot:
         return flask.send_file(io.BytesIO(
-            phantomjs.get_har_with_image(url, selectors, warc_prefix=warc_prefix,
+            get_har_with_image(url, selectors, warc_prefix=warc_prefix,
                   include_rendered=include_rendered, return_screenshot=True)), mimetype='image/png')
     else:
-        return flask.jsonify(phantomjs.get_har_with_image(url, selectors, warc_prefix=warc_prefix,
+        return flask.jsonify(get_har_with_image(url, selectors, warc_prefix=warc_prefix,
                                                           include_rendered=include_rendered))
