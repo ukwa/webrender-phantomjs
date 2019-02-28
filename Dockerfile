@@ -29,7 +29,7 @@ WORKDIR webrender
 
 EXPOSE 8010
 
-CMD gunicorn -c gunicorn.ini wrengine:app
+CMD gunicorn -c gunicorn.ini webrender.wrengine:app
 
 # Note on Ubuntu 14.04 font packages include:
 # xfonts-base ttf-mscorefonts-installer fonts-arphic-bkai00mp fonts-arphic-bsmi00lp fonts-arphic-gbsn00lp fonts-arphic-gkai00mp fonts-arphic-ukai fonts-farsiweb fonts-nafees fonts-sil-abyssinica fonts-sil-ezra fonts-sil-padauk fonts-unfonts-extra fonts-unfonts-core ttf-indic-fonts fonts-thai-tlwg fonts-lklug-sinhala
