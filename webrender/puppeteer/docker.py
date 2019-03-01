@@ -30,7 +30,7 @@ def get_har_with_image(url, selectors=None, proxy=WARCPROX, warc_prefix=date.tod
     }
 
     # Set up volume mount:
-    tmp_dir = tempfile.mkdtemp()
+    tmp_dir = tempfile.mkdtemp(dir=os.environ.get('WEB_RENDER_TMP', '/tmp/'))
     d_vol = {
         tmp_dir: {'bind': '/output', 'mode': 'rw'}
     }
