@@ -16,6 +16,9 @@ client = docker.from_env()
 # Location of WARCPROX proxy used to store WARC records:
 WARCPROX = os.getenv("WARCPROX", None)
 
+# Get the Docker Network to create the browser container on:
+DOCKER_NETWORK = os.getenv("DOCKER_NETWORK", None)
+
 
 def get_har_with_image(url, selectors=None, proxy=WARCPROX, warc_prefix=date.today().isoformat(),
                        include_rendered=False, return_screenshot=False):
@@ -36,7 +39,7 @@ def get_har_with_image(url, selectors=None, proxy=WARCPROX, warc_prefix=date.tod
     }
     # Set up the container and run it:
     d_c = client.containers.create('ukwa/webrender-puppeteer', command="node renderer.js %s" % url,
-                                   environment=d_env, volumes=d_vol, cap_add=['SYS_ADMIN'],
+                                   environment=d_env, volumes=d_vol, cap_add=['SYS_ADMIN'], network=DOCKER_NETWORK,
                                    detach=True, restart_policy={"Name": "on-failure", "MaximumRetryCount": 2})
     d_c.start()
     d_c.wait(timeout=60*7) # Kill renders that take far too long (7 mins)
@@ -50,7 +53,7 @@ def get_har_with_image(url, selectors=None, proxy=WARCPROX, warc_prefix=date.tod
     if not os.path.exists(tmp):
         logger.error("Rendering to JSON failed for %s" % url)
         logger.warning("FAILED:\logs=%s" % d_logs )
-        return "FAIL"
+        return {"status": "FAILED"}
     else:
         logger.debug("GOT:\nlogs=%s" % d_logs)
     with open(tmp, "r") as i:
