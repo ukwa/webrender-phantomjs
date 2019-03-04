@@ -29,7 +29,8 @@ def get_har_with_image(url, selectors=None, proxy=WARCPROX, warc_prefix=date.tod
         proxy = os.environ['HTTP_PROXY']
     d_env = {
         'HTTP_PROXY': proxy,
-        'HTTPS_PROXY': proxy
+        'HTTPS_PROXY': proxy,
+        'LC_ALL': 'en_US.utf8'
     }
 
     # Set up volume mount:
@@ -155,7 +156,7 @@ def _warcprox_write_har_content(har_js, url, warc_prefix, warcprox=WARCPROX, inc
 
         # Store the on-ready DOM:
         _warcprox_write_record(warcprox_address=warcprox,
-                url="onreadydom:{}".format(page.get('id',None)),
+                url="onreadydom:{}".format(location),
                 warc_type="resource", content_type="text/html",
                 payload=dom, location=location,
                 extra_headers= warcprox_headers )
@@ -175,10 +176,10 @@ def _warcprox_write_har_content(har_js, url, warc_prefix, warcprox=WARCPROX, inc
             # Keep the :root image
             if selector == ':root':
                 full_png = image
-                xpointurl = page.get('id')
+                xpointurl = location
             else:
                 # https://www.w3.org/TR/2003/REC-xptr-framework-20030325/
-                xpointurl = "%s#xpointer(%s)" % (page.get('id'), selector)
+                xpointurl = "%s#xpointer(%s)" % (location, selector)
             # And write the WARC:
             _warcprox_write_record(warcprox_address=warcprox,
                 url="screenshot:{}".format(xpointurl),
@@ -190,13 +191,13 @@ def _warcprox_write_har_content(har_js, url, warc_prefix, warcprox=WARCPROX, inc
             # Store a thumbnail:
             (full_jpeg, thumb_jpeg) = full_and_thumb_jpegs(full_png)
             _warcprox_write_record(warcprox_address=warcprox,
-                url="thumbnail:{}".format(page['id']),
+                url="thumbnail:{}".format(location),
                 warc_type="resource", content_type='image/jpeg',
                 payload=thumb_jpeg, location=location, extra_headers=warcprox_headers)
             # Store an image map HTML file:
             imagemap = build_imagemap(full_jpeg, page)
             _warcprox_write_record(warcprox_address=warcprox,
-                url="imagemap:{}".format(page['id']),
+                url="imagemap:{}".format(location),
                 warc_type="resource", content_type='text/html; charset="utf-8"',
                 payload=bytearray(imagemap,'UTF-8'), location=location,
                 extra_headers=warcprox_headers)
